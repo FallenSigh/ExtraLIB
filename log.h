@@ -6,9 +6,11 @@
 #include <format>
 #include <source_location>
 
+// https://github.com/archibate/minilog
+
 namespace zstl {
 
-#define MINILOG_FOREACH_LOG_LEVEL(f) \
+#define ZSTLLOG_FOREACH_LOGLEVEL(f) \
     f(trace)\
     f(debug)\
     f(info)\
@@ -18,7 +20,7 @@ namespace zstl {
 
     enum class log_level : std::uint8_t{
 #define _FUNCTION(name) name,
-        MINILOG_FOREACH_LOG_LEVEL(_FUNCTION)
+        ZSTLLOG_FOREACH_LOGLEVEL(_FUNCTION)
 #undef _FUNCTION
     };
 
@@ -29,7 +31,6 @@ namespace zstl {
             "\E[37m", // trace
             "\E[35m", // debug
             "\E[32m", // info
-            // "\E[34m", // critical
             "\E[33m", // warning
             "\E[31m", // error 
             "\E[31;1m"    // fatal
@@ -37,9 +38,9 @@ namespace zstl {
 
         inline char k_reset_ansi_color[4] = "\E[m";
 
-#define MINILOG_IF_HAS_ANSI_COLORS(x) x
+#define ZSTLLOG_IF_HAS_ANSI_COLORS(x) x
 #else
-#define MINILOG_IF_HAS_ANSI_COLORS(x)
+#define ZSTLLOG_IF_HAS_ANSI_COLORS(x)
 #endif
 
         inline log_level max_level = log_level::info;
@@ -47,7 +48,7 @@ namespace zstl {
         inline std::string log_level_name(log_level lev) {
             switch (lev) {
 #define _FUNCTION(name) case log_level::name: return #name;
-    MINILOG_FOREACH_LOG_LEVEL(_FUNCTION);
+    ZSTLLOG_FOREACH_LOGLEVEL(_FUNCTION);
 #undef _FUNCTION
             };
             return "unknown";
@@ -101,6 +102,6 @@ void log_##name(_details::with_source_location<std::format_string<Args...>> fmt,
     log(log_level::name, std::move(fmt), std::forward<Args>(args)...); \
 }\
 
-MINILOG_FOREACH_LOG_LEVEL(_FUNCTION)
+ZSTLLOG_FOREACH_LOGLEVEL(_FUNCTION)
 #undef _FUNCTION
 }
