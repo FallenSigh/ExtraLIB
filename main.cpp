@@ -23,8 +23,8 @@ int main() {
     
     exlib::unints<100> a = 23213213200ull;
 
-    std::cout << a.hex_str() << "\n";
-    std::cout << a.bin_str() << "\n";
-    std::cout << a.dec_str() << "\n";
+    std::cout << a.hex() << "\n";
+    std::cout << a.bin() << "\n";
+    std::cout << a.str() << "\n";
     return 0;
 }

@@ -60,7 +60,7 @@ namespace exlib {
         std::string str() const noexcept {
             constexpr std::size_t M = digits10 * 4;
             int_base<M, uint4_t, Allocator, false> res;
-            auto abs = this->abs();
+            auto&& abs = this->abs();
 
             for (std::size_t i = 0; i < N; i++) {
                 res[0] = abs._at(N - 1 - i);
@@ -92,7 +92,37 @@ namespace exlib {
                     ss << res._data[i];
                 }
             }
+
+            if (ss.str().empty()) {
+                ss << "0";
+            }
             return ss.str();
+        }
+
+        std::string bin() const noexcept {
+            std::string res;
+            for (std::size_t i = N - 1; ~i; i--) {
+                res += ('0' + this->_at(i));
+            }
+            return res;
+        }
+
+        std::string hex() const noexcept {
+            std::stringstream ss;
+            std::size_t n = N / 4;
+            std::size_t r = N % 4;
+
+            for (std::size_t i = 0; i < n; i++) {
+                std::uint32_t x = this->_at(i * 4) + (this->_at(i * 4 + 1) * 2) + (this->_at(i * 4 + 2) * 4) + (this->_at(i * 4 + 3)) * 8;
+                ss << std::hex << x;                
+            }
+            uint32_t x = ((r >= 0) ? this->_at(n * 4) : 0) + ((r >= 1) ? this->_at(n * 4 + 1) * 2 : 0) + ((r >= 2) ? this->_at(n * 4 + 2) * 4 : 0);
+            ss << std::hex << x;
+
+            std::string res;
+            ss >> res;
+            std::reverse(res.begin(), res.end());
+            return res;
         }
 
         template<typename I>
@@ -130,6 +160,212 @@ namespace exlib {
             for (std::size_t j = 0; j < N; j++) {
                 this->_at(j) = (j < M) ? (x >> j & 1) : x_sign;
             }
+            return *this;
+        }
+
+        template<std::size_t M, class OWord, class OAllocator, bool OSigned>
+        int_base<std::max(N, M), Word, Allocator, Signed> operator*(const int_base<M, OWord, OAllocator, OSigned>& other) const noexcept {
+            auto&& lhs_abs = int_base<std::max(N, M), Word, Allocator, Signed>(this->abs());
+            auto&& rhs_abs = other.abs();
+
+            int_base<std::max(N, M), Word, Allocator, Signed> res = 0;
+            for (std::size_t i = 0; i < M; i++) {
+                if (rhs_abs[i]) {
+                    res += (lhs_abs << i);
+                }
+            }
+            if (this->sign() != other.sign()) {
+                res = ~res + int_base<std::max(N, M), Word, Allocator, Signed>(1);
+            }
+            return res;
+        }
+
+        template<typename T>
+        requires std::is_integral_v<T>
+        int_base<std::max(N, sizeof(T) * byte_size), Word, Allocator, Signed> operator*(const T& val) const noexcept {
+            return *this * int_base<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
+        }
+
+        template<typename T>
+        requires std::is_integral_v<T>
+        friend int_base<std::max(sizeof(T) * byte_size, N), Word, Allocator, Signed> operator*(const T& lhs, const_reference rhs) noexcept {
+            return int_base<sizeof(T) * byte_size, Word, Allocator, Signed>(lhs) * rhs;
+        }
+
+        template<std::size_t M, class OWord, class OAllocator, bool OSigned>
+        int_base<std::max(N, M), Word, Allocator, Signed> operator/(const int_base<M, OWord, OAllocator, OSigned>& other) const {
+            if (other == 0) {
+                throw std::runtime_error("divided by zero!");
+            }
+
+            auto&& lhs_abs = this->abs();
+            auto&& rhs_abs = other.abs();
+
+            int_base<std::max(N, M), Word, Allocator, Signed> quotient = 0;
+            int_base<std::max(N, M), Word, Allocator, Signed> remainder = 0;
+
+            for (std::size_t i = 0; i < N; i++) {
+                remainder <<= 1;
+                remainder[0] = lhs_abs[N - 1- i];
+
+                if (remainder >= rhs_abs) {
+                    remainder = remainder - rhs_abs;
+                    quotient[N - 1 - i] = 1;
+                }
+            }
+
+            if (this->sign() != other.sign()) {
+                quotient = ~quotient + int_base<std::max(N, M), Word, Allocator, Signed>(1);
+            }
+
+            return quotient;
+        }
+
+        template<typename I>
+        requires std::is_integral_v<I>
+        int_base<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> operator/(const I& val) const {
+            return *this / int_base<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
+        }
+
+        template<typename I>
+        requires std::is_integral_v<I>
+        friend int_base<std::max(sizeof(I) * byte_size, N), Word, Allocator, Signed> operator/(const I& lhs, const_reference rhs) noexcept {
+            return int_base<sizeof(I) * byte_size, Word, Allocator, Signed>(lhs) / rhs;
+        }
+
+        template<std::size_t M, class OWord, class OAllocator, bool OSigned>
+        int_base<std::max(N, M), Word, Allocator, Signed> operator%(const int_base<M, OWord, OAllocator, OSigned>& other) const {
+            if (other == 0) {
+                throw std::runtime_error("divided by zero!");
+            }
+
+            auto lhs_abs = this->abs();
+            int_base<M, OWord, OAllocator, OSigned> rhs_abs = other.abs();
+
+            int_base<std::max(N, M), Word, Allocator, Signed> remainder = 0;
+
+            for (std::size_t i = 0; i < N; i++) {
+                remainder <<= 1;
+                remainder[0] = lhs_abs[N - 1- i];
+
+                if (remainder >= rhs_abs) {
+                    remainder -= rhs_abs;
+                }
+            }
+
+            if (this->sign() != remainder.sign()) {
+                remainder = ~remainder + int_base<std::max(N, M), Word, Allocator, Signed>(1);
+            }
+
+            return remainder;
+        }
+
+        template<typename T>
+        requires std::is_integral_v<T>
+        int_base<std::max(N, sizeof(T) * byte_size), Word, Allocator, Signed> operator%(const T& val) const {
+            return *this % int_base<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
+        }
+
+        template<typename T>
+        requires std::is_integral_v<T>
+        friend int_base<std::max(sizeof(T) * byte_size, N), Word, Allocator, Signed> operator%(const T& lhs, const_reference rhs) noexcept {
+            return int_base<sizeof(T) * byte_size, Word, Allocator, Signed>(lhs) % rhs;
+        }
+
+        template<std::size_t M, class OWord, class OAllocator, bool OSigned>
+        reference operator*=(const int_base<M, OWord, OAllocator, OSigned>& other) noexcept {
+            auto lhs_abs = this->abs();
+            auto rhs_abs = other.abs();
+            
+            self_type result = 0;
+            for (std::size_t i = 0; i < M; ++i) {
+                if (rhs_abs[i]) {
+                    result += (lhs_abs << i);
+                }
+            }
+
+            if (this->sign() != other.sign()) {
+                result = ~result + 1;
+            }
+            *this = std::move(result);
+            return *this;
+        }
+
+        template<typename T>
+        requires std::is_integral_v<T>
+        reference operator*=(const T& val) noexcept {
+            *this *= int_base<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
+            return *this;
+        }
+
+        template<std::size_t M, class OWord, class OAllocator, bool OSigned>
+        reference operator/=(const int_base<M, OWord, OAllocator, OSigned>& other) {
+            if (other == 0) {
+                throw std::runtime_error("divided by zero!");
+            }
+            auto lhs_abs = this->abs();
+            int_base<M, OWord, OAllocator, OSigned> rhs_abs = other.abs();
+
+            self_type quotient = 0;
+            self_type remainder = 0;
+
+            for (std::size_t i = 0; i < N; i++) {
+                remainder <<= 1;
+                remainder[0] = lhs_abs[N - 1- i];
+
+                if (remainder >= rhs_abs) {
+                    remainder = remainder - rhs_abs;
+                    quotient[N - 1 - i] = 1;
+                }
+            }
+
+            if (this->sign() != other.sign()) {
+                quotient = ~quotient + int_base<std::max(N, M), Word, Allocator, Signed>(1);
+            }
+
+            *this = std::move(quotient);
+            return *this;
+        }
+
+        template<typename T>
+        requires std::is_integral_v<T>
+        reference operator/=(const T& val) {
+            *this /= int_base<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
+            return *this;
+        }
+
+        template<std::size_t M, class OWord, class OAllocator, bool OSigned>
+        reference operator%=(const int_base<M, OWord, OAllocator, OSigned>& other) {
+            if (other == 0) {
+                throw std::runtime_error("divided by zero!");
+            }
+
+            auto lhs_abs = this->abs();
+            int_base<M, OWord, OAllocator, OSigned> rhs_abs = other.abs();
+
+            self_type remainder = 0;
+
+            for (std::size_t i = 0; i < N; i++) {
+                remainder <<= 1;
+                remainder[0] = lhs_abs[N - 1- i];
+
+                if (remainder >= rhs_abs) {
+                    remainder -= rhs_abs;
+                }
+            }
+
+            if (this->sign() != remainder.sign()) {
+                remainder = ~remainder + 1;
+            }
+
+            *this = std::move(remainder);
+            return *this;
+        }
+
+        template<typename T>
+        requires std::is_integral_v<T>
+        reference operator%=(const T& val) {
+            *this %= int_base<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
             return *this;
         }
 
@@ -386,7 +622,6 @@ namespace exlib {
             return _bitwise_sub<M>(
             [this](std::size_t i) { return (i < N) ? this->_at(i) : this->sign(); },
             [&val, &val_sign](std::size_t i) { return (i < M) ? (val >> i & 1) : val_sign; });
-        
         }
 
         template<std::size_t M, class OWord, class OAllocator, bool OSigned>
@@ -581,14 +816,14 @@ namespace exlib {
             return *this >= int_base<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
         }
 
-        self_type abs() const noexcept {
-            if (!Signed) return *this;
+        std::conditional_t<!Signed, const_reference, self_type> abs() const noexcept {
+            if constexpr (!Signed) return *this;
 
             return (sign() == 0) ? *this : ~(*this) + self_type(1);
         }
 
         bit sign() const noexcept {
-            if (!Signed) return 0;
+            if constexpr (!Signed) return 0;
             return this->_at(N - 1);
         }
 
@@ -606,14 +841,6 @@ namespace exlib {
             }
 
             return sign() == static_cast<bit>(0) ? static_cast<word_type>(0) : static_cast<word_type>(-1);
-        }
-
-        void setsign(bit sign) noexcept {
-            if (!Signed) return;
-
-            if (sign != this->sign()) {
-                log_info("TODO: setsign");
-            }
         }
 
         constexpr std::size_t size() const noexcept {
@@ -666,19 +893,19 @@ namespace exlib {
             return (this->_get_word(pos) & (1 << _which_bit(pos))) != static_cast<word_type>(0);
         }
 
-        word_type& _get_word(std::size_t pos) noexcept {
+        inline word_type& _get_word(std::size_t pos) noexcept {
             return _data[_which_word(pos)];
         }
 
-        const word_type& _get_word(std::size_t pos) const noexcept {
+        inline const word_type& _get_word(std::size_t pos) const noexcept {
             return _data[_which_word(pos)];
         }
 
-        static std::size_t _which_word(std::size_t pos) noexcept {
+        inline static std::size_t _which_word(std::size_t pos) noexcept {
             return pos / word_size;
         }
 
-        static std::size_t _which_bit(std::size_t pos) noexcept {
+        inline static std::size_t _which_bit(std::size_t pos) noexcept {
             return pos % word_size;
         }
 
@@ -777,43 +1004,43 @@ namespace exlib {
                 return reference(_obj, _index);
             }
 
-            iterator operator++() noexcept {
+            inline iterator operator++() noexcept {
                 auto copy = *this;
                 _index++;            
                 return copy;
             }
 
-            iterator& operator++(int) noexcept {
+            inline iterator& operator++(int) noexcept {
                 _index++;
                 return *this;
             }
 
-            iterator& operator+=(difference_type n) {
+            inline iterator& operator+=(difference_type n) {
                 _index += n;
                 return *this;
             }
 
-            iterator operator+(difference_type x) const noexcept {
+            inline iterator operator+(difference_type x) const noexcept {
                 auto copy = *this;
                 copy._index += x;
                 return copy;
             }
 
-            iterator operator-(difference_type x) const noexcept {
+            inline iterator operator-(difference_type x) const noexcept {
                 auto copy = *this;
                 copy._index -= x;
                 return copy;
             }
 
-            difference_type operator-(iterator other) const noexcept {
+            inline difference_type operator-(iterator other) const noexcept {
                 return _index - other._index;
             }
 
-            bool operator!=(const iterator& other) const noexcept {
+            inline bool operator!=(const iterator& other) const noexcept {
                 return _index != other._index;
             }
 
-            bool operator==(const iterator& other) const noexcept {
+            inline bool operator==(const iterator& other) const noexcept {
                 return _index == other._index;
             }
         };
@@ -911,15 +1138,15 @@ namespace exlib {
                 return *this;
             }
 
-            bool operator~() const noexcept {
+            inline bool operator~() const noexcept {
                 return ((*_word) & (1 << _b_pos)) == 0;
             }
 
-            operator bool() const noexcept {
+            inline operator bool() const noexcept {
                 return ((*_word) & (1 << _b_pos)) != 0; 
             }
 
-            bool value() const noexcept {
+            inline bool value() const noexcept {
                 return ((*_word) & (1 << _b_pos)) != 0; 
             }
 
@@ -941,11 +1168,11 @@ namespace exlib {
             const_bit_reference(const const_bit_reference&) noexcept = default;
             ~const_bit_reference() noexcept { }
         
-            bool operator~() const noexcept {
+            inline bool operator~() const noexcept {
                 return ((*_word) & (1 << _b_pos)) == 0;
             }
 
-            operator bool() const noexcept {
+            inline operator bool() const noexcept {
                 return ((*_word) & (1 << _b_pos)) != 0; 
             }
         };
