@@ -1,49 +1,30 @@
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <iomanip>
 #include <iostream>
+#include <random>
+#include <boost/multiprecision/cpp_dec_float.hpp>
+#include <vector>
 
-#include "nbits.h"
+#include "log.h"
+#include "nfloats.h"
 
-int main(void) {
-    zstl::nbits_int<8> a = 5;
-    zstl::nbits_int<5> b = 3;
-    zstl::nbits_int<8> c = 10;
-    zstl::nbits_int<8> d = 8;
-    int x = 1;
-    // auto e = zstl::nbits_int<8>(5);
-    auto e = 5;
-    a <<= 2;
-    a >>= 2;
-    b += a;
-    a += b;
-    a -= b;
-    a += zstl::nbits_int<8>(1);
-    b += zstl::nbits_int<5>(1);
-    a -= 3;
-    a *= 4;
-    std::cout << a << " " << a.dec() << "\n";
-    std::cout << b << " " << b.dec() << "\n";
-    std::cout << c << " " << c.dec() << "\n";
-    std::cout << d << " " << d.dec() << "\n";
+int main() {
+    exlib::set_log_level(exlib::log_level::debug);
+    auto to_bin = [](double x, const char *split = "\0") -> std::string {
+        std::uint64_t num_as_int = *reinterpret_cast<uint64_t*>(&x);
+        auto bin = std::bitset<64>(num_as_int);
+        std::string res = bin.to_string();
+        res.insert(1, split);
+        res.insert(1 + 12, split);
+        return res;
+    };
+    
+    exlib::unints<100> a = 23213213200ull;
 
-    std::cout << "a + b: " << (a + b).dec() << " b + a: " << (b + a).dec() << "\n";
-    std::cout << "a - b: " << (a - b).dec() << " b - a: " << (b - a).dec() << "\n";
-    std::cout << "a * b: " << (a * b).dec() << " b * a: " << (b * a).dec() << "\n";
-    std::cout << "a / b: " << (a / b).dec() << " b / a: " << (b / a).dec() << "\n";
-    std::cout << "a % b: " << (a % b).dec() << " b % a: " << (b % a).dec() << "\n";
-    std::cout << "a + e: " << (a + e).dec() << " e + a: " << (e + a).dec() << "\n";
-    std::cout << "a - e: " << (a - e).dec() << " e - a: " << (e - a).dec() << "\n";
-    std::cout << "a * e: " << (a * e).dec() << " e * a: " << (e * a).dec() << "\n";
-    std::cout << "a / e: " << (a / e).dec() << " e / a: " << (e / a).dec() << "\n";
-    std::cout << "a % e: " << (a % e).dec() << " e % a: " << (e % a).dec() << "\n";
-    std::cout << "a & b: " << (a & b).dec() << " b & a: " << (b & a).dec() << "\n";
-    std::cout << "a | b: " << (a | b).dec() << " b | a: " << (b | a).dec() << "\n";
-    std::cout << "a ^ b: " << (a ^ b).dec() << " b ^ a: " << (b ^ a).dec() << "\n";
-    std::cout << "a > b: " << (a > b) << " b > a: " << (b > a) << "\n";
-    std::cout << "a < b: " << (a < b) << " b < a: " << (b < a) << "\n";
-    std::cout << "a = b: " << (a == b) << " b = a: " << (b == a) << "\n";
-    std::cout << "a != b: " << (a != b) << " b != a: " << (b != a) << "\n";
-    std::cout << "a >= b: " << (a >= b) << " b >= a: " << (b >= a) << "\n";
-    std::cout << "a <= b: " << (a <= b) << " b <= a: " << (b <= a) << "\n";
-    std::cout << "a << " << x << " : " << (a << x) << "\n";
-    std::cout << "a >> " << x << " : " << (a >> x) << "\n";
+    std::cout << a.hex_str() << "\n";
+    std::cout << a.bin_str() << "\n";
+    std::cout << a.dec_str() << "\n";
     return 0;
 }

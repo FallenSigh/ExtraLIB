@@ -8,7 +8,7 @@
 
 // https://github.com/archibate/minilog
 
-namespace zstl {
+namespace exlib {
 
 #define ZSTLLOG_FOREACH_LOGLEVEL(f) \
     f(trace)\
