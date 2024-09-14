@@ -8,13 +8,21 @@
 #include <stdexcept>
 #include <type_traits>
 
-#include "uint4_t.h"
-#include "array_type.h"
-#include "../log.h"
+#include "details/uint4_t.h"
+#include "details/array_type.h"
 
 #define byte_size 8
 
 namespace exlib {
+    template<std::size_t N, class Word, class Allocator, bool Signed>
+    struct integer;
+
+    template<std::size_t N, class Word = unsigned int, class Allocator = std::allocator<Word>>
+    using nints = integer<N, Word, Allocator, true>;
+    
+    template<std::size_t N, class Word = unsigned int, class Allocator = std::allocator<Word>>
+    using unints = integer<N, Word, Allocator, false>;
+
     template<std::size_t N, class Word, class Allocator, bool Signed>
     struct integer {
         static_assert(std::is_integral_v<Word>);;

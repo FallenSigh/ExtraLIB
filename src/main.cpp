@@ -1,11 +1,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <iomanip>
 #include <iostream>
-#include <random>
-#include <boost/multiprecision/cpp_dec_float.hpp>
-#include <vector>
 
 #include "log.h"
 #include "nfloats.h"

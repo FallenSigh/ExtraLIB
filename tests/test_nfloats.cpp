@@ -3,8 +3,8 @@
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <random>
 
-#include "../log.h"
-#include "../nfloats.h"
+#include "log.h"
+#include "nfloats.h"
 
 int main() {
     exlib::set_log_level(exlib::log_level::debug);

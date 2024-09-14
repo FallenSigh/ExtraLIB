@@ -1,11 +1,10 @@
-#include <memory>
 #include <random>
 #include <cassert>
 #include <unordered_map>
 #include <functional>
 
-#include "../log.h"
-#include "../nints.h"
+#include "log.h"
+#include "integer.h"
 
 int main(void) {
     exlib::set_log_level(exlib::log_level::debug);

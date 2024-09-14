@@ -4,10 +4,13 @@
 #include <cstdint>
 #include <limits>
 #include <type_traits>
+
 #include "log.h"
-#include "unints.h"
+#include "integer.h"
 
 namespace exlib {
+    template<std::size_t n_mantissa, class Exponent>
+    struct nfloats;
 
     template<typename F>
     struct mantissa_bit {    };
