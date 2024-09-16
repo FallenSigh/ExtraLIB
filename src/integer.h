@@ -14,6 +14,7 @@
 #define byte_size 8
 
 namespace exlib {
+    // declaration
     template<std::size_t N, class Word, class Allocator, bool Signed>
     struct integer;
 
@@ -22,7 +23,21 @@ namespace exlib {
     
     template<std::size_t N, class Word = unsigned int, class Allocator = std::allocator<Word>>
     using unints = integer<N, Word, Allocator, false>;
+}
 
+namespace exlib {
+    // type traits
+    template<typename T>
+    struct is_integer : std::false_type {};
+
+    template<std::size_t N, class Word, class Allocator, bool Signed>
+    struct is_integer<integer<N, Word, Allocator, Signed>> : std::true_type {};
+
+    template<typename T>
+    inline constexpr bool is_integer_v = is_integer<T>::value;
+}
+
+namespace exlib {
     template<std::size_t N, class Word, class Allocator, bool Signed>
     struct integer {
         static_assert(std::is_integral_v<Word>);;
@@ -64,13 +79,37 @@ namespace exlib {
 
         template<std::size_t M, class OWord, class OAllocator, bool OSigned>
         integer(const integer<M, OWord, OAllocator, OSigned>& other) noexcept {
-            std::copy(other._data.cbegin(), other._data.cbegin() + std::min(array_size, other.array_size), this->_data.begin());
+            this->reset(other.filling_mask());
+            for (std::size_t i = 0; i < N; i++) {
+                this->_at(i) = (i < M) ? other._at(i) : other.sign();
+            }
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         integer(const I& i) noexcept {
             this->assign_integral(i);
+        }
+
+        integer(const std::string& str) noexcept {
+            this->rd_string(str);
+        }
+
+        reference rd_bin_string(std::string s) noexcept {
+            this->reset(0);
+            bool neg = false;
+            if (s[0] == '-') {
+                neg = true;
+                s = s.substr(1, s.size() - 1);
+            }
+            for (std::size_t i = 0; i < N; i++) {
+                this->_at(i) = (i < s.size()) ? (s[s.size() - 1 - i] - '0'): 0;
+            }
+
+            if (neg) {
+                *this = ~(*this) + 1;
+            }
+            return *this;
         }
 
         reference rd_string(std::string s) noexcept {
@@ -87,8 +126,18 @@ namespace exlib {
                 src._data[i] = (i < s.size()) ? (s[s.size() - 1 - i] - '0') : 0;
             }
 
-            for (std::size_t i = 0; i < digits10; i++) {
-                *this += ((src >> (4 * i)) & 0xf) * static_cast<std::size_t>(std::pow(10, i));
+            // Reverse double dabble
+            for (std::size_t i = 0; i < N; i++) {
+                this->_at(N - 1) = src[0];
+                src >>= 1;
+                if (i != N - 1) {
+                    for (std::size_t j = 0; j < src.array_size; j++) {
+                        if (src._data[j] >= 8) {
+                            src._data[j] -= 3;
+                        }
+                    }
+                    *this >>= 1;
+                }
             }
 
             if (neg) {
@@ -98,11 +147,36 @@ namespace exlib {
             return *this;
         }
 
+        std::string as_mantissa_str() const noexcept {
+            constexpr std::size_t M = std::size_t(N / std::log2(10)) * 4;
+            integer<M, details::uint4_t, void, false> res = 0;
+            
+            for (std::size_t i = 0; i < N; i++) {
+                res[M - 1] = this->_at(i);
+
+                for (std::size_t j = 0; j < res.array_size; j++) {
+                    if (res._data[j] >= 8u) {
+                        res._data[j] -= 3u;
+                    }
+                }
+                if (i != N - 1) {
+                    res >>= 1;
+                }
+            }
+
+            std::stringstream ss;
+            for (std::size_t i = res.array_size - 1; ~i; i--) {
+                ss << res._data[i].template value<int>();
+            }
+            return ss.str();
+        } 
+
         std::string str() const noexcept {
             constexpr std::size_t M = digits10 * 4;
             integer<M, details::uint4_t, void, false> res;
             auto&& abs = this->abs();
 
+            // double dabble
             for (std::size_t i = 0; i < N; i++) {
                 res[0] = abs._at(N - 1 - i);
 
@@ -116,7 +190,6 @@ namespace exlib {
                     res <<= 1;
                 }
             }
-
             std::stringstream ss;
             if (sign()) {
                 ss << "-";
@@ -165,7 +238,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         reference operator=(const I& i) noexcept {
             return this->assign_integral(i);
         }
@@ -173,9 +246,10 @@ namespace exlib {
         template<std::size_t M, class OWord, class OAllocator, bool OSigned>
         reference operator=(const integer<M, OWord, OAllocator, OSigned>& other) noexcept {
             this->reset(other.filling_mask());
-            for (std::size_t i = 0; i < std::min(N, M); i++) {
-                this->_at(i) = other._at(i);
+            for (std::size_t i = 0; i < N; i++) {
+                this->_at(i) = (i < M) ? other._at(i) : other.sign();
             }
+            
             return *this;
         }
 
@@ -196,7 +270,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         reference assign_integral(I i) noexcept {
             using type = std::conditional_t<Signed, std::make_signed_t<I>, std::make_unsigned_t<I>>;
             type x = static_cast<type>(i);
@@ -225,16 +299,16 @@ namespace exlib {
             return res;
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        integer<std::max(N, sizeof(T) * byte_size), Word, Allocator, Signed> operator*(const T& val) const noexcept {
-            return *this * integer<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> operator*(const I& val) const noexcept {
+            return *this * integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        friend integer<std::max(sizeof(T) * byte_size, N), Word, Allocator, Signed> operator*(const T& lhs, const_reference rhs) noexcept {
-            return integer<sizeof(T) * byte_size, Word, Allocator, Signed>(lhs) * rhs;
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        friend integer<std::max(sizeof(I) * byte_size, N), Word, Allocator, Signed> operator*(const I& lhs, const_reference rhs) noexcept {
+            return integer<sizeof(I) * byte_size, Word, Allocator, Signed>(lhs) * rhs;
         }
 
         template<std::size_t M, class OWord, class OAllocator, bool OSigned>
@@ -267,13 +341,13 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> operator/(const I& val) const {
             return *this / integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         friend integer<std::max(sizeof(I) * byte_size, N), Word, Allocator, Signed> operator/(const I& lhs, const_reference rhs) noexcept {
             return integer<sizeof(I) * byte_size, Word, Allocator, Signed>(lhs) / rhs;
         }
@@ -305,16 +379,16 @@ namespace exlib {
             return remainder;
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        integer<std::max(N, sizeof(T) * byte_size), Word, Allocator, Signed> operator%(const T& val) const {
-            return *this % integer<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> operator%(const I& val) const {
+            return *this % integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        friend integer<std::max(sizeof(T) * byte_size, N), Word, Allocator, Signed> operator%(const T& lhs, const_reference rhs) noexcept {
-            return integer<sizeof(T) * byte_size, Word, Allocator, Signed>(lhs) % rhs;
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        friend integer<std::max(sizeof(I) * byte_size, N), Word, Allocator, Signed> operator%(const I& lhs, const_reference rhs) noexcept {
+            return integer<sizeof(I) * byte_size, Word, Allocator, Signed>(lhs) % rhs;
         }
 
         template<std::size_t M, class OWord, class OAllocator, bool OSigned>
@@ -336,10 +410,10 @@ namespace exlib {
             return *this;
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        reference operator*=(const T& val) noexcept {
-            *this *= integer<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        reference operator*=(const I& val) noexcept {
+            *this *= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
             return *this;
         }
 
@@ -372,10 +446,10 @@ namespace exlib {
             return *this;
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        reference operator/=(const T& val) {
-            *this /= integer<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        reference operator/=(const I& val) {
+            *this /= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
             return *this;
         }
 
@@ -407,16 +481,16 @@ namespace exlib {
             return *this;
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        reference operator%=(const T& val) {
-            *this %= integer<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        reference operator%=(const I& val) {
+            *this %= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
             return *this;
         }
 
         template<std::size_t M, class OWord, class OAllocator, bool OSigned>
         bit bitwise_add_assign(const integer<M, OWord, OAllocator, OSigned>& other) noexcept {
-            bit carry = 0; 
+            bit carry = 0;
             for (std::size_t i = 0; i < N; i++) {
                 bit lbit = (i < N) ? this->_at(i) : this->sign();
                 bit rbit = (i < M) ? other._at(i) : other.sign();
@@ -475,7 +549,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> operator&(const I& i) const noexcept {
             integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> res = *this;
             return res._bitwise_and(integer<sizeof(I) * byte_size, Word, Allocator, Signed>(i));
@@ -494,7 +568,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> operator|(const I& i) const noexcept {
             integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> res = *this;
             return res._bitwise_or(integer<sizeof(I) * byte_size, Word, Allocator, Signed>(i));
@@ -513,7 +587,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> operator^(const I& i) const noexcept {
             integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> res = *this;
             return res._bitwise_xor(integer<sizeof(I) * byte_size, Word, Allocator, Signed>(i));
@@ -544,18 +618,19 @@ namespace exlib {
             return res;
         }
 
-        template<std::size_t M>
-        reference _bitwise_and_assign(const_reference other) noexcept {
+        template<std::size_t M, class OAllocator, bool OSigned>
+        reference _bitwise_and_assign(const integer<M, Word, OAllocator, OSigned>& other) noexcept {
             for (std::size_t i = 0; i < array_size; i++) {
-                this->_data[i] &= (i < other.array_size) ? other._data[i] : other.filling_mask();
+                _data[i] &= ((i < other.array_size) ? other._data[i] : other.filling_mask());
             }
             return *this;
         }
 
         template<std::size_t M, class OWord, class OAllocator, bool OSigned>
-        std::enable_if_t<!std::is_same_v<Word, OWord>, reference> _bitwise_and_assign(const integer<M, OWord, OAllocator, OSigned>& other) noexcept {
+        requires (!std::is_same_v<Word, OWord>)
+        reference _bitwise_and_assign(const integer<M, OWord, OAllocator, OSigned>& other) noexcept {
             for (std::size_t i = 0; i < N; i++) {
-                this->_at(i) &= (i < M) ? other._at(i) : other.sign();
+                this->_at(i) &= ((i < M) ? other._at(i) : other.sign());
             }
             return *this;
         }
@@ -580,18 +655,19 @@ namespace exlib {
             return res;
         }
 
-        template<std::size_t M>
-        reference _bitwise_or_assign(const_reference other) noexcept {
+        template<std::size_t M, class OAllocator, bool OSigned>
+        reference _bitwise_or_assign(const integer<M, Word, OAllocator, OSigned>& other) noexcept {
             for (std::size_t i = 0; i < array_size; i++) {
-                this->_data[i] |= (i < other.array_size) ? other._data[i] : other.filling_mask();
+                _data[i] |= ((i < other.array_size) ? other._data[i] : other.filling_mask());
             }
             return *this;
         }
 
         template<std::size_t M, class OWord, class OAllocator, bool OSigned>
-        std::enable_if_t<!std::is_same_v<Word, OWord>, reference> _bitwise_or_assign(const integer<M, OWord, OAllocator, OSigned>& other) noexcept {
+        requires (!std::is_same_v<Word, OWord>)
+        reference _bitwise_or_assign(const integer<M, OWord, OAllocator, OSigned>& other) noexcept {
             for (std::size_t i = 0; i < N; i++) {
-                this->_at(i) |= (i < M) ? other._at(i) : other.sign();
+                this->_at(i) |= ((i < M) ? other._at(i) : other.sign());
             }
             return *this;
         }
@@ -614,18 +690,19 @@ namespace exlib {
             return res;
         }
 
-        template<std::size_t M>
-        reference _bitwise_xor_assign(const_reference other) noexcept {
+        template<std::size_t M, class OAllocator, bool OSigned>
+        reference _bitwise_xor_assign(const integer<M, Word, OAllocator, OSigned>& other) noexcept {
             for (std::size_t i = 0; i < array_size; i++) {
-                this->_data[i] ^= (i < other.array_size) ? other._data[i] : other.filling_mask();
+                _data[i] ^= ((i < other.array_size) ? other._data[i] : other.filling_mask());
             }
             return *this;
         }
 
         template<std::size_t M, class OWord, class OAllocator, bool OSigned>
-        std::enable_if_t<!std::is_same_v<Word, OWord>, reference> _bitwise_xor_assign(const integer<M, OWord, OAllocator, OSigned>& other) noexcept {
+        requires (!std::is_same_v<Word, OWord>)
+        reference _bitwise_xor_assign(const integer<M, OWord, OAllocator, OSigned>& other) noexcept {
             for (std::size_t i = 0; i < N; i++) {
-                this->_at(i) ^= (i < M) ? other._at(i) : other.sign();
+                this->_at(i) ^= ((i < M) ? other._at(i) : other.sign());
             }
             return *this;
         }
@@ -638,7 +715,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         reference operator+=(const I& x) noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             auto val = static_cast<std::conditional_t<Signed, std::make_signed_t<I>, std::make_unsigned_t<I>>>(x);
@@ -656,7 +733,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         reference operator-=(const I& x) noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             auto val = static_cast<std::conditional_t<Signed, std::make_signed_t<I>, std::make_unsigned_t<I>>>(x);
@@ -674,7 +751,7 @@ namespace exlib {
         }
 
         template<typename I>
-            requires std::is_integral_v<I>
+            requires std::is_integral_v<I> && (!is_integer_v<I>)
         integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> operator+(const I& val) const noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             const bool val_sign = std::is_signed_v<I> ? std::signbit(val) : 0;
@@ -684,7 +761,7 @@ namespace exlib {
         }
 
         template<typename I>
-            requires std::is_integral_v<I>
+            requires std::is_integral_v<I> && (!is_integer_v<I>)
         friend integer<std::max(sizeof(I) * byte_size, N), Word, Allocator, Signed> operator+(const I& lhs, const_reference rhs) noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             const bool lhs_sign = std::is_signed_v<I> ? std::signbit(lhs) : 0;
@@ -701,7 +778,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         friend integer<std::max(sizeof(I) * byte_size, N), Word, Allocator, Signed> operator-(const I& lhs, const_reference rhs) noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             const bool lhs_sign = std::is_signed_v<I> ? std::signbit(lhs) : 0;
@@ -710,11 +787,11 @@ namespace exlib {
             [&rhs](std::size_t i) { return (i < N) ? rhs[i] : rhs.sign(); });
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        integer<std::max(N, sizeof(T) * byte_size), Word, Allocator, Signed> operator-(const T& val) const noexcept {
-            constexpr std::size_t M = sizeof(T) * byte_size;
-            const bool val_sign = std::is_signed_v<T> ? std::signbit(val) : 0;
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed> operator-(const I& val) const noexcept {
+            constexpr std::size_t M = sizeof(I) * byte_size;
+            const bool val_sign = std::is_signed_v<I> ? std::signbit(val) : 0;
             return _bitwise_sub<M>(
             [this](std::size_t i) { return (i < N) ? this->_at(i) : this->sign(); },
             [&val, &val_sign](std::size_t i) { return (i < M) ? (val >> i & 1) : val_sign; });
@@ -726,7 +803,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         bool operator==(const I& val) const noexcept {
             return this->_bitwise_equal(integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val));
         }
@@ -737,7 +814,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         bool operator!=(const I& val) const noexcept {
             return !(this->_bitwise_equal(integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val)));
         }
@@ -752,7 +829,7 @@ namespace exlib {
             if (x < 0) {
                 throw std::runtime_error("left shifted bit count is negative!");
             }
-            if (x >= N) {
+            if (static_cast<std::size_t>(x) >= N) {
                 this->reset(0);
             } else {
                 for (std::size_t i = N - 1; ~i; i--) {
@@ -772,7 +849,7 @@ namespace exlib {
             if (x < 0) {
                 throw std::runtime_error("right shifted bit count is negative!");
             }
-            if (x >= N) {
+            if (static_cast<std::size_t>(x) >= N) {
                 this->reset(this->filling_mask());
             } else {
                 for (std::size_t i = 0; i < N; i++) {
@@ -830,7 +907,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         friend bool operator<(const I& lhs, const_reference rhs) noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             const bit lhs_sign = std::is_signed_v<I> ? std::signbit(lhs) : 0;
@@ -850,7 +927,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         bool operator<(const I& i) const noexcept {
             return *this < integer<sizeof(I) * byte_size, Word, Allocator, Signed>(i);
         }
@@ -861,13 +938,13 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         friend bool operator<=(const I& lhs, const_reference rhs) noexcept {
             return !(rhs > lhs);
         }
 
         template<typename I>
-            requires std::is_integral_v<I>
+            requires std::is_integral_v<I> && (!is_integer_v<I>)
         bool operator<=(const I& val) const noexcept {
             return *this <= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
         }
@@ -889,14 +966,14 @@ namespace exlib {
             return false;
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        friend bool operator>(const T& lhs, const_reference rhs) noexcept {
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        friend bool operator>(const I& lhs, const_reference rhs) noexcept {
             return !(rhs <= lhs);
         }
 
         template<typename I>
-            requires std::is_integral_v<I>
+            requires std::is_integral_v<I> && (!is_integer_v<I>)
         bool operator>(const I& i) const noexcept {
             return *this > integer<sizeof(I) * byte_size, Word, Allocator, Signed>(i);
         }
@@ -906,16 +983,16 @@ namespace exlib {
             return *this == other || *this > other;
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        friend bool operator>=(const T& lhs, const_reference rhs) noexcept {
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        friend bool operator>=(const I& lhs, const_reference rhs) noexcept {
             return !(rhs < lhs);
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        bool operator>=(const T& val) const noexcept {
-            return *this >= integer<sizeof(T) * byte_size, Word, Allocator, Signed>(val);
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        bool operator>=(const I& val) const noexcept {
+            return *this >= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
         }
 
         self_type abs() const noexcept {
@@ -933,7 +1010,7 @@ namespace exlib {
             this->_data.reset(value);
         }
 
-        void swap(const_reference other) noexcept {
+        void swap(reference other) noexcept {
             std::swap(_data, other._data);
         }
 
@@ -945,7 +1022,7 @@ namespace exlib {
             return sign() == static_cast<bit>(0) ? (0) : (-1);
         }
 
-        constexpr std::size_t size() const noexcept {
+        inline constexpr static std::size_t size() noexcept {
             return N;
         }
 
@@ -1097,11 +1174,15 @@ namespace exlib {
             return res;
         }
 
-        template<typename T>
-        requires std::is_integral_v<T>
-        operator T() const noexcept {
-            T base = static_cast<T>(1);
-            T res = static_cast<T>(0);
+        operator bool() const noexcept {
+            return (*this != 0);
+        }
+
+        template<typename I>
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
+        operator I() const noexcept {
+            I base = static_cast<I>(1);
+            I res = static_cast<I>(0);
 
             for (std::size_t i = 0; i < N - Signed; i++) {
                 res += base * this->_at(i);
@@ -1310,3 +1391,73 @@ namespace exlib {
     };
     
 }
+
+// std
+// type traits
+template<class Int, typename I>
+requires (std::is_integral_v<I> && (!exlib::is_integer_v<I>)) && (exlib::is_integer_v<Int>)
+struct std::common_type<I, Int> {
+    static constexpr std::size_t n = Int::size();
+    static constexpr std::size_t m = sizeof(I) * byte_size;
+    using type = std::conditional_t<(n > m), Int, I>;
+};
+
+template<class Int, typename I>
+requires (std::is_integral_v<I> && (!exlib::is_integer_v<I>)) && (exlib::is_integer_v<Int>)
+struct std::common_type<Int, I> {
+    static constexpr std::size_t n = Int::size();
+    static constexpr std::size_t m = sizeof(I) * byte_size;
+    using type = std::conditional_t<(n > m), Int, I>;
+};
+
+template<class Int1, class Int2>
+requires exlib::is_integer_v<Int1> && exlib::is_integer_v<Int2>
+struct std::common_type<Int1, Int2> {
+    static constexpr std::size_t n = Int1::size();
+    static constexpr std::size_t m = Int2::size();
+    using type = std::conditional_t<(n > m), Int1, Int2>;
+};
+
+template<std::size_t N, class Word, class Allocator, bool Signed>
+struct std::is_integral<exlib::integer<N, Word, Allocator, Signed>> : public std::true_type {};
+
+// formatter
+template <class Int>
+requires exlib::is_integer_v<Int>
+struct std::formatter<Int> : std::formatter<std::string>{
+    auto format(const auto& integer, auto& ctx) const {
+        return std::format_to(ctx.out(), "{}", integer.str());
+    }
+};
+
+namespace std {
+    template<class Int1, class Int2>
+    requires std::is_integral_v<Int1> && std::is_integral_v<Int2>
+    std::common_type_t<Int1, Int2> pow(Int1 a, Int2 b) {
+        std::common_type_t<Int1, Int2> res = std::common_type_t<Int1, Int2>(1);
+        while (b) {
+            if (b & 1) res *= a;
+            a *= a;
+            b >>= 1;
+        }
+        return res;
+    }
+
+    template<class Int1, class Int2>
+    requires std::is_integral_v<Int1> && std::is_integral_v<Int1>
+    std::common_type_t<Int1, Int2> gcd(Int1 a, Int2 b) {
+        if (b == 0) {
+            return a;
+        }
+        return gcd(b, a % b);
+    }
+
+    template<class Int1, class Int2>
+    requires std::is_integral_v<Int1> && std::is_integral_v<Int1>
+    std::common_type_t<Int1, Int2> lcm(Int1 a, Int2 b) {
+        auto t = a / gcd(a, b);
+        return a * b;
+    }
+}
+
+

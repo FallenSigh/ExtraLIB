@@ -73,7 +73,7 @@ namespace exlib {
 
         public:
             template<class U> requires std::constructible_from<T, U>
-            consteval with_source_location(U&& inner, std::source_location loc = std::source_location::current()):
+            constexpr with_source_location(U&& inner, std::source_location loc = std::source_location::current()):
             inner(std::forward<U>(inner)), loc(std::move(loc)) {}
 
             constexpr const T& format() const { return inner; }
