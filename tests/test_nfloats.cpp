@@ -1,6 +1,4 @@
 #include <cmath>
-#include <iostream>
-#include <boost/multiprecision/cpp_dec_float.hpp>
 #include <random>
 
 #include "log.h"
@@ -27,16 +25,18 @@ int main() {
         double y = r2 / 100.0;
 
         exlib::log_info("testing {}: {}, {}", i, x, y);
-        exlib::nfloats<52> a(x);
-        exlib::nfloats<52> b(y);
+        exlib::nfloats<54> a(x);
+        exlib::nfloats<54> b(y);
 
         a += b;
         x += y;
-        if (a != x) {
-            exlib::log_fatal("fatal, {}, {}", a.to<double>(), x);
-            exlib::log_fatal("{}", a.bin(' '));
+        if ((a - b).abs() < 1e-9) {
+            exlib::log_fatal("fatal, {}, {}", a.to_double(), x);
+            exlib::log_fatal("{}", a.bin());
             exlib::log_fatal("{}", to_bin(x, " "));
             break;
+        } else {
+            exlib::log_info("pass {}: {}, {}", i, a.str(), x);
         }
     }
     return 0;

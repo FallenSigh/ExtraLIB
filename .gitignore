@@ -1,5 +1,6 @@
 build
 .cache
+.vscode
 to_line.py
 test.cpp
 test
@@ -7,3 +8,5 @@ test_nfloats
 test_nints
 test_unints
 main
+fraction
+log

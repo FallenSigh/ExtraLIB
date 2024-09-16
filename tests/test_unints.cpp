@@ -14,8 +14,8 @@ int main(void) {
     int m = 0;
     constexpr int n = 100000;
 
-    exlib::unints<64, uint8_t, std::allocator<uint8_t>> a = 0;
-    exlib::unints<64, uint32_t> b = 0;
+    exlib::unints<64, uint32_t, void> a = 0;
+    exlib::unints<64, uint32_t, std::allocator<uint32_t>> b = 0;
     unsigned long long c = 0;
     unsigned long long d = 0;
 
