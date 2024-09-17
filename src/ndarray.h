@@ -13,18 +13,18 @@
 #include "log.h"
 
 namespace exlib {
-    template <typename ShapeType, class Backend, class Allocator>
+    template <typename Shape, class Backend, class Allocator>
     struct ndarray {
-        static_assert(is_shape_v<ShapeType>);
+        static_assert(is_shape_v<Shape>);
 
-        inline static constexpr auto shape = ShapeType::value;
-        inline static constexpr std::size_t block_size = ShapeType::block_size;
-        inline static constexpr std::size_t N = ShapeType::first;
+        inline static constexpr auto shape = Shape::value;
+        inline static constexpr std::size_t block_size = Shape::block_size;
+        inline static constexpr std::size_t N = Shape::first;
         
-        using shape_type = ShapeType;
+        using shape_type = Shape;
         using backend_type = Backend;
         using one_dim = std::false_type;
-        using data_type = ndarray<typename ShapeType::next_shape, Backend>;
+        using data_type = ndarray<typename Shape::next_shape, Backend>;
         using array_type = std::conditional_t<std::is_void_v<Allocator>, details::static_array<data_type, N>, details::dynamic_array<data_type, N, typename details::rebind<data_type, Allocator>::type>>;
 
         using iterator = typename array_type::iterator;
@@ -32,9 +32,9 @@ namespace exlib {
         using reverse_iterator = typename array_type::reverse_iterator;
         using const_reverse_iterator = typename array_type::const_reverse_iterator;
         
-        using self_type = ndarray<ShapeType, Backend>;
-        using reference = ndarray<ShapeType, Backend>&;
-        using const_reference = const ndarray<ShapeType, Backend>&;
+        using self_type = ndarray<Shape, Backend>;
+        using reference = ndarray<Shape, Backend>&;
+        using const_reference = const ndarray<Shape, Backend>&;
 
         array_type data;
 
@@ -50,6 +50,20 @@ namespace exlib {
 
         template <std::ranges::input_range Range>
         ndarray(Range in) noexcept {
+            this->assign(in);
+        }
+
+        ndarray(const data_type& other) noexcept {
+            data.fill(other);
+        }
+
+        template <std::ranges::input_range Range>
+        reference operator=(Range in) noexcept {
+            return this->assign(in);
+        }
+
+        template <std::ranges::input_range Range>
+        reference assign(Range in) noexcept {
             std::size_t chunk_size = std::min(in.size(), block_size);
             std::size_t M = std::min(in.size(), shape_type::size);
             auto it = in.begin();
@@ -63,6 +77,7 @@ namespace exlib {
                     break;
                 }
             }
+            return *this;
         }
 
         void _flatten(std::vector<backend_type>& v) const noexcept {
@@ -79,126 +94,264 @@ namespace exlib {
             return res;
         }
 
-        template <typename Shape>
-        requires is_shape_v<Shape>
-        ndarray<Shape, Backend> reshape() const noexcept {
-            static_assert(N * block_size == Shape::size);
-            ndarray<Shape, Backend> res;
+        template <typename OShape>
+        requires is_shape_v<OShape>
+        ndarray<OShape, Backend> reshape() const noexcept {
+            static_assert(N * block_size == OShape::size);
+            ndarray<OShape, Backend> res;
             std::vector<backend_type> t;
             this->_flatten(t);
             res = t;
             return res;
         };
 
-        reference operator+=(const data_type& other) noexcept {
-            std::ranges::transform(data, data.begin(), [&other](auto& elem) {
-                elem += other;
-                return elem;
-            });
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        reference operator+=(const T& val) noexcept {
+            std::ranges::for_each(data, [&val](auto& elem){ elem += val; });
             return *this;
         }
 
-        reference operator-=(const data_type& other) noexcept {
-            std::ranges::transform(data, data.begin(), [&other](auto& elem) {
-                elem -= other;
-                return elem;
-            });
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        reference operator-=(const T& val) noexcept {
+            std::ranges::for_each(data, [&val](auto& elem){ elem -= val; });
             return *this;
         }
 
-        reference operator*=(const data_type& other) noexcept {
-            std::ranges::transform(data, data.begin(), [&other](auto& elem) {
-                elem *= other;
-                return elem;
-            });
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        reference operator*=(const T& val) noexcept {
+            std::ranges::for_each(data, [&val](auto& elem){ elem *= val; });
             return *this;
         }
 
-        reference operator/=(const data_type& other) noexcept {
-            std::ranges::transform(data, data.begin(), [&other](auto& elem) {
-                elem /= other;
-                return elem;
-            });
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        reference operator/=(const T& val) noexcept {
+            std::ranges::for_each(data, [&val](auto& elem){ elem /= val; });
             return *this;
         }
 
-        reference operator+=(const_reference other) noexcept {
-            std::ranges::transform(data, other.data, data.begin(), [](auto& lhs, auto& rhs){
-                lhs += rhs;
-                return lhs;
-            });
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        reference operator%=(const T& val) noexcept {
+            std::ranges::for_each(data, [&val](auto& elem){ elem %= val; });
             return *this;
         }
 
-        reference operator-=(const_reference other) noexcept {
-            std::ranges::transform(data, other.data, data.begin(), [](auto& lhs, auto& rhs){
-                lhs -= rhs;
-                return lhs;
-            });
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        friend self_type operator+(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            res += lhs;
+            return res;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        friend self_type operator-(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            res -= lhs;
+            return res;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        friend self_type operator/(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            res /= lhs;
+            return res;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        friend self_type operator*(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            res *= lhs;
+            return res;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        friend self_type operator%(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            res %= lhs;
+            return res;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        self_type operator+(const T& val) noexcept {
+            self_type copy = *this;
+            copy += val;
+            return copy;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        self_type operator-(const T& val) noexcept {
+            self_type copy = *this;
+            copy -= val;
+            return copy;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        self_type operator*(const T& val) noexcept {
+            self_type copy = *this;
+            copy *= val;
+            return copy;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        self_type operator/(const T& val) noexcept {
+            self_type copy = *this;
+            copy /= val;
+            return copy;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        self_type operator%(const T& val) noexcept {
+            self_type copy = *this;
+            copy %= val;
+            return copy;
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T> 
+        reference operator+=(const T& other) noexcept {
+            if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
+                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l += r; });
+            } else {
+                std::ranges::for_each(data, [&other](auto& elem){ elem += other; });
+            }
             return *this;
         }
 
-        reference operator*=(const_reference other) noexcept {
-            std::ranges::transform(data, other.data, data.begin(), [](auto& lhs, auto& rhs){
-                lhs *= rhs;
-                return lhs;
-            });
+        template <typename T>
+        requires is_ndarray_v<T> 
+        reference operator-=(const T& other) noexcept {
+            if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
+                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l -= r; });
+            } else {
+                std::ranges::for_each(data, [&other](auto& elem){ elem -= other; });
+            }
             return *this;
         }
 
-        reference operator/=(const_reference other) noexcept {
-            std::ranges::transform(data, other.data, data.begin(), [](auto& lhs, auto& rhs){
-                lhs /= rhs;
-                return lhs;
-            });
+        template <typename T>
+        requires is_ndarray_v<T> 
+        reference operator*=(const T& other) noexcept {
+            if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
+                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l *= r; });
+            } else {
+                std::ranges::for_each(data, [&other](auto& elem){ elem *= other; });
+            }
             return *this;
         }
 
-        self_type operator+(const data_type& other) noexcept {
+        template <typename T>
+        requires is_ndarray_v<T> 
+        reference operator/=(const T& other) noexcept {
+            if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
+                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l /= r; });
+            } else {
+                std::ranges::for_each(data, [&other](auto& elem){ elem /= other; });
+            }
+            return *this;
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T> 
+        reference operator%=(const T& other) noexcept {
+            if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
+                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l %= r; });
+            } else {
+                std::ranges::for_each(data, [&other](auto& elem){ elem %= other; });
+            }
+            return *this;
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T> 
+        friend self_type operator+(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            res += lhs;
+            return res;
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T> 
+        friend self_type operator-(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            res -= lhs;
+            return res;
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T> 
+        friend self_type operator*(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            res *= lhs;
+            return res;
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T> 
+        friend self_type operator/(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            res /= lhs;
+            return res;
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T> 
+        friend self_type operator%(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            res %= lhs;
+            return res;
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T> 
+        self_type operator+(const T& other) noexcept {
             self_type copy = *this;
             copy += other;
             return copy;
         }
 
-        self_type operator-(const data_type& other) noexcept {
+        template <typename T>
+        requires is_ndarray_v<T> 
+        self_type operator-(const T& other) noexcept {
             self_type copy = *this;
             copy -= other;
             return copy;
         }
 
-        self_type operator*(const data_type& other) noexcept {
+        template <typename T>
+        requires is_ndarray_v<T> 
+        self_type operator*(const T& other) noexcept {
             self_type copy = *this;
             copy *= other;
             return copy;
         }
 
-        self_type operator/(const data_type& other) noexcept {
+        template <typename T>
+        requires is_ndarray_v<T> 
+        self_type operator/(const T& other) noexcept {
             self_type copy = *this;
             copy /= other;
             return copy;
         }
 
-        self_type operator+(const_reference other) noexcept {
+        template <typename T>
+        requires is_ndarray_v<T> 
+        self_type operator%(const T& other) noexcept {
             self_type copy = *this;
-            copy += other;
-            return copy;
-        }
-
-        self_type operator-(const_reference other) noexcept {
-            self_type copy = *this;
-            copy -= other;
-            return copy;
-        }
-
-        self_type operator*(const_reference other) noexcept {
-            self_type copy = *this;
-            copy *= other;
-            return copy;
-        }
-
-        self_type operator/(const_reference other) noexcept {
-            self_type copy = *this;
-            copy /= other;
+            copy %= other;
             return copy;
         }
 
