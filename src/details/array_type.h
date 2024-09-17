@@ -4,16 +4,17 @@
 #include <vector>
 namespace exlib {
     namespace details {
+        template <typename T, class U>
+        struct rebind {
+            using type = typename std::allocator_traits<U>::template rebind_alloc<T>;
+        };
+
         template<typename T, std::size_t N>
         struct static_array : public std::array<T, N>{
             using base_class_type = std::array<T, N>;
 
             static_array() noexcept {
-                this->fill(static_cast<T>(0u));
-            }
 
-            void reset(T value = 0) noexcept {
-                this->fill(value);
             }
         };
 
@@ -22,9 +23,9 @@ namespace exlib {
             using base_class_type = std::vector<T, Allocator>;
 
             dynamic_array() noexcept 
-            : base_class_type(N, static_cast<T>(0u))  {}
+            : base_class_type(N)  {}
         
-            void reset(T value = 0) noexcept {
+            void fill(T value = 0) noexcept {
                 std::fill(this->begin(), this->end(), static_cast<T>(value));
             }
         };  
