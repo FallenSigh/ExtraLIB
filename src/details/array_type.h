@@ -1,8 +1,10 @@
+#pragma once
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <memory>
 #include <vector>
+
 namespace exlib {
     namespace details {
         template <typename T, class U>
