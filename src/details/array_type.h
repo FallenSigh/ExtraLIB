@@ -1,12 +1,18 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <memory>
 #include <vector>
 namespace exlib {
     namespace details {
         template <typename T, class U>
         struct rebind {
             using type = typename std::allocator_traits<U>::template rebind_alloc<T>;
+        };
+
+        template <class U>
+        struct rebind<void, U> {
+            using type = std::allocator<void>;
         };
 
         template<typename T, std::size_t N>
