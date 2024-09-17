@@ -124,6 +124,15 @@ namespace exlib {
             }
         }
 
+        template <typename T = backend_type>
+        T sum() noexcept {
+            T res = 0;
+            for (std::size_t i = 0; i < N; i++) {
+                res += data[i];
+            }
+            return res;
+        }
+
         ndarray<exlib::shape<shape_type::size>> flatten() const noexcept {
             ndarray<exlib::shape<shape_type::size>> res;
             std::vector<backend_type> t;

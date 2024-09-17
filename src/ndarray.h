@@ -94,6 +94,15 @@ namespace exlib {
             return res;
         }
 
+        template <typename T = backend_type>
+        T sum() noexcept {
+            T res = 0;      
+            for (std::size_t i = 0; i < N; i++) {
+                res += data[i].sum();
+            }
+            return res;
+        }
+
         template <typename OShape>
         requires is_shape_v<OShape>
         ndarray<OShape, Backend> reshape() const noexcept {
@@ -221,10 +230,12 @@ namespace exlib {
         }
 
         template <typename T>
-        requires is_ndarray_v<T> 
+        requires is_ndarray_v<T>
         reference operator+=(const T& other) noexcept {
             if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
                 std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l += r; });
+            } else if constexpr (N == T::N) {
+
             } else {
                 std::ranges::for_each(data, [&other](auto& elem){ elem += other; });
             }
