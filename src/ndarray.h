@@ -2,46 +2,39 @@
 #include <algorithm>
 #include <format>
 #include <initializer_list>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
-#include <tuple>
-#include <array>
 #include <type_traits>
+#include <vector>
 
-#include "details/ndarray.h"
 #include "details/print_tuple.h"
+#include "details/ndarray.h"
 #include "log.h"
 
-#define UNUSED(t)
-
 namespace exlib {
-    namespace details {
-        template <typename ...Args>
-        consteval std::size_t mul(Args... args) {
-            return (args * ...);
-        }
-    }
-}
-
-namespace exlib {
-    template <class Backend, std::size_t N, std::size_t ...Shape>
+    template <typename ShapeType, class Backend, class Allocator>
     struct ndarray {
+        static_assert(is_shape_v<ShapeType>);
+
+        inline static constexpr auto shape = ShapeType::value;
+        inline static constexpr std::size_t block_size = ShapeType::block_size;
+        inline static constexpr std::size_t N = ShapeType::first;
+        
+        using shape_type = ShapeType;
         using backend_type = Backend;
         using one_dim = std::false_type;
-        using array_type = std::array<ndarray<Backend, Shape...>, N>;
-        using data_type = ndarray<Backend, Shape...>;
-        
+        using data_type = ndarray<typename ShapeType::next_shape, Backend>;
+        using array_type = std::conditional_t<std::is_void_v<Allocator>, details::static_array<data_type, N>, details::dynamic_array<data_type, N, typename details::rebind<data_type, Allocator>::type>>;
+
         using iterator = typename array_type::iterator;
         using const_iterator = typename array_type::const_iterator;
         using reverse_iterator = typename array_type::reverse_iterator;
         using const_reverse_iterator = typename array_type::const_reverse_iterator;
         
-        using self_type = ndarray<Backend, N, Shape...>;
-        using reference = ndarray<Backend, N, Shape...>&;
-        using const_reference = const ndarray<Backend, N, Shape...>&;
-        
-        inline static constexpr std::tuple<std::size_t, std::decay_t<decltype(Shape)>...> shape = {N, Shape...};
-        inline static constexpr std::size_t block_size = details::mul(Shape...);
+        using self_type = ndarray<ShapeType, Backend>;
+        using reference = ndarray<ShapeType, Backend>&;
+        using const_reference = const ndarray<ShapeType, Backend>&;
 
         array_type data;
 
@@ -54,6 +47,48 @@ namespace exlib {
                 data[i] = *(s.begin() + i);
             }
         }
+
+        template <std::ranges::input_range Range>
+        ndarray(Range in) noexcept {
+            std::size_t chunk_size = std::min(in.size(), block_size);
+            std::size_t M = std::min(in.size(), shape_type::size);
+            auto it = in.begin();
+            std::size_t total_size = 0;
+            for (std::size_t i = 0; i < N; i++) {
+                data[i] = std::ranges::subrange(it, it + chunk_size);
+                it += chunk_size;
+                total_size += chunk_size;
+                chunk_size = std::min(block_size, M - total_size);
+                if (chunk_size == 0) {
+                    break;
+                }
+            }
+        }
+
+        void _flatten(std::vector<backend_type>& v) const noexcept {
+            for (std::size_t i = 0; i < N; i++) {
+                data[i]._flatten(v);
+            }
+        }
+
+        ndarray<exlib::shape<shape_type::size>> flatten() const noexcept {
+            ndarray<exlib::shape<shape_type::size>> res;
+            std::vector<backend_type> t;
+            this->_flatten(t);
+            res = t;
+            return res;
+        }
+
+        template <typename Shape>
+        requires is_shape_v<Shape>
+        ndarray<Shape, Backend> reshape() const noexcept {
+            static_assert(N * block_size == Shape::size);
+            ndarray<Shape, Backend> res;
+            std::vector<backend_type> t;
+            this->_flatten(t);
+            res = t;
+            return res;
+        };
 
         reference operator+=(const data_type& other) noexcept {
             std::ranges::transform(data, data.begin(), [&other](auto& elem) {
@@ -117,6 +152,30 @@ namespace exlib {
                 return lhs;
             });
             return *this;
+        }
+
+        self_type operator+(const data_type& other) noexcept {
+            self_type copy = *this;
+            copy += other;
+            return copy;
+        }
+
+        self_type operator-(const data_type& other) noexcept {
+            self_type copy = *this;
+            copy -= other;
+            return copy;
+        }
+
+        self_type operator*(const data_type& other) noexcept {
+            self_type copy = *this;
+            copy *= other;
+            return copy;
+        }
+
+        self_type operator/(const data_type& other) noexcept {
+            self_type copy = *this;
+            copy /= other;
+            return copy;
         }
 
         self_type operator+(const_reference other) noexcept {
