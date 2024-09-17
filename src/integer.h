@@ -59,11 +59,11 @@ namespace exlib {
         using word_type = Word;
         using array_type = std::conditional_t<std::is_void_v<Allocator>, details::static_array<word_type, array_size>, details::dynamic_array<word_type, N, Allocator>>;
         using bit = bool;
-        using pointer = word_type*;
 
         array_type _data;
 
         integer() noexcept {
+            _data.fill(0);
         }
 
         integer(const_reference other) noexcept {
@@ -940,7 +940,7 @@ namespace exlib {
         }
 
         inline void reset(word_type value = 0) noexcept {
-            this->_data.reset(value);
+            this->_data.fill(value);
         }
 
         void swap(reference other) noexcept {

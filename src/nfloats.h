@@ -37,6 +37,8 @@ namespace exlib {
 namespace exlib {
     template<std::size_t n_fraction, class Exponent>
     struct nfloats {
+        static_assert(std::is_integral_v<Exponent>);;
+        
         using reference = nfloats<n_fraction, Exponent>&;
         using const_reference = const nfloats<n_fraction, Exponent>&;
         using self_type = nfloats<n_fraction, Exponent>;
