@@ -71,7 +71,7 @@ void *operator new(std::size_t size) {
     void* ptr = malloc(size);
     if (was_enable && ptr) {
         zstl::_malloc_hook::allocated.insert({ptr, {size, caller}});
-        printf("new ptr = %p, size = %zd\n", ptr, size);
+        // printf("new ptr = %p, size = %zd\n", ptr, size);
     }
     zstl::_malloc_hook::enable = was_enable;
     if (ptr == nullptr) {
@@ -83,7 +83,7 @@ void *operator new(std::size_t size) {
 void operator delete(void *ptr) noexcept {
     bool was_enable = std::exchange(zstl::_malloc_hook::enable, false);
     if (was_enable && ptr) {
-        printf("delete ptr = %p\n", ptr);
+        // printf("delete ptr = %p\n", ptr);
         zstl::_malloc_hook::allocated.erase(ptr);
     }
     free(ptr);
