@@ -364,8 +364,10 @@ namespace exlib {
         reference operator+=(const T& other) noexcept {
             using type = std::common_type_t<dtype, typename T::dtype>;
             if constexpr (T::N == 1) {
+                // try to broadcast
                 std::ranges::for_each(data, [&other](auto& elem){ elem += other.data[0]; });
             } else {
+                // add directly
                 std::ranges::transform(data, other.data, data.begin(), std::plus<type>());
             }
             return *this;

@@ -370,52 +370,92 @@ namespace exlib {
         requires is_ndarray_v<T>
         reference operator+=(const T& other) noexcept {
             if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
+                // same type: add directly
                 std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l += r; });
+            } else if constexpr (N == T::N) {
+                // same size in dim: try to broadcast
+                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l += r; });
+            } else if constexpr (T::N == 1) {
+                // other size == 1: try to broadcast
+                std::ranges::for_each(data, [&other](auto& elem){ elem += other[0]; });
             } else {
+                // recursion
                 std::ranges::for_each(data, [&other](auto& elem){ elem += other; });
             }
             return *this;
         }
 
         template <typename T>
-        requires is_ndarray_v<T> 
+        requires is_ndarray_v<T>
         reference operator-=(const T& other) noexcept {
             if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
+                // same type: add directly
                 std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l -= r; });
+            } else if constexpr (N == T::N) {
+                // same size in dim: try to broadcast
+                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l -= r; });
+            } else if constexpr (T::N == 1) {
+                // other size == 1: try to broadcast
+                std::ranges::for_each(data, [&other](auto& elem){ elem -= other[0]; });
             } else {
+                // recursion
                 std::ranges::for_each(data, [&other](auto& elem){ elem -= other; });
             }
             return *this;
         }
 
         template <typename T>
-        requires is_ndarray_v<T> 
+        requires is_ndarray_v<T>
         reference operator*=(const T& other) noexcept {
             if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
+                // same type: add directly
                 std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l *= r; });
+            } else if constexpr (N == T::N) {
+                // same size in dim: try to broadcast
+                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l *= r; });
+            } else if constexpr (T::N == 1) {
+                // other size == 1: try to broadcast
+                std::ranges::for_each(data, [&other](auto& elem){ elem *= other[0]; });
             } else {
+                // recursion
                 std::ranges::for_each(data, [&other](auto& elem){ elem *= other; });
             }
             return *this;
         }
 
         template <typename T>
-        requires is_ndarray_v<T> 
+        requires is_ndarray_v<T>
         reference operator/=(const T& other) noexcept {
             if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
+                // same type: add directly
                 std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l /= r; });
+            } else if constexpr (N == T::N) {
+                // same size in dim: try to broadcast
+                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l /= r; });
+            } else if constexpr (T::N == 1) {
+                // other size == 1: try to broadcast
+                std::ranges::for_each(data, [&other](auto& elem){ elem /= other[0]; });
             } else {
+                // recursion
                 std::ranges::for_each(data, [&other](auto& elem){ elem /= other; });
             }
             return *this;
         }
 
         template <typename T>
-        requires is_ndarray_v<T> 
+        requires is_ndarray_v<T>
         reference operator%=(const T& other) noexcept {
             if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
+                // same type: add directly
                 std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l %= r; });
+            } else if constexpr (N == T::N) {
+                // same size in dim: try to broadcast
+                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l %= r; });
+            } else if constexpr (T::N == 1) {
+                // other size == 1: try to broadcast
+                std::ranges::for_each(data, [&other](auto& elem){ elem %= other[0]; });
             } else {
+                // recursion
                 std::ranges::for_each(data, [&other](auto& elem){ elem %= other; });
             }
             return *this;
