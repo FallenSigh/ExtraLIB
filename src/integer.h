@@ -745,7 +745,7 @@ namespace exlib {
             constexpr std::size_t M = sizeof(I) * byte_size;
             const bit lhs_sign = std::is_signed_v<I> ? std::signbit(lhs) : 0;
             if (lhs_sign != rhs.sign()) {
-                return lhs_sign == 1;
+                return op(lhs_sign, rhs.sign());
             }
 
             for (std::size_t i = std::max(N, M); ~i; i--) {
@@ -764,7 +764,7 @@ namespace exlib {
         bool _bitwise_compare(const T& other, Func op) const noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();    
             if (this->sign() != other.sign()) {
-                return this->sign() == 0;
+                return !op(this->sign(), other.sign());
             }
 
             for (std::size_t i = std::max(N, M); ~i; i--) {
@@ -804,7 +804,7 @@ namespace exlib {
         template<typename I>
         requires std::is_integral_v<std::decay_t<I>>
         friend bool operator<=(const I& lhs, const_reference rhs) noexcept {
-            return !(rhs > lhs);
+            return (rhs == lhs) || (rhs < lhs);
         }
 
         template<typename I>
@@ -827,7 +827,7 @@ namespace exlib {
         template<typename I>
             requires std::is_integral_v<std::decay_t<I>>
         bool operator>(const I& i) const noexcept {
-            return *this > integer<sizeof(I) * byte_size, Word, Allocator, Signed>(i);
+            return _bitwise_compare(integer<sizeof(I) * byte_size, Word, Allocator, Signed>(i), [](const auto& l, const auto& r) { return l > r; });
         }
 
         template <typename T> requires is_integer_v<std::decay_t<T>>
