@@ -34,7 +34,7 @@ namespace exlib {
     struct is_integer<integer<N, Word, Allocator, Signed>> : std::true_type {};
 
     template<typename T>
-    inline constexpr bool is_integer_v = is_integer<T>::value;
+    inline constexpr bool is_integer_v = is_integer<std::decay_t<T>>::value;
 }
 
 namespace exlib {
@@ -76,13 +76,13 @@ namespace exlib {
         }
 
         template <typename I>
-        requires is_integer_v<std::decay_t<I>>
+        requires is_integer_v<I>
         integer(const I& other) noexcept {
             assign(other);
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>> && (!is_integer_v<std::decay_t<I>>)
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         integer(const I& i) noexcept {
             assign(i);
         }
@@ -92,13 +92,13 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>> && (!is_integer_v<std::decay_t<I>>)
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         reference operator=(const I& i) noexcept {
             return assign(i);
         }
  
         template <typename T>
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         reference operator=(const T& other) noexcept {
             return assign(other);
         }
@@ -112,7 +112,7 @@ namespace exlib {
         }
 
         template <typename T>
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         reference assign(const T& other) noexcept {
             this->reset(other.filling_mask());
             for (std::size_t i = 0; i < N; ++i) {
@@ -134,9 +134,9 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>> && (!is_integer_v<std::decay_t<I>>)
+        requires std::is_integral_v<I> && (!is_integer_v<I>)
         reference assign(const I& i) noexcept {
-            using type = std::conditional_t<Signed, std::make_signed_t<std::decay_t<I>>, std::make_unsigned_t<std::decay_t<I>>>;
+            using type = std::conditional_t<Signed, std::make_signed_t<I>, std::make_unsigned_t<I>>;
             type x = static_cast<type>(i);
             constexpr std::size_t M = sizeof(x) * byte_size;
             const bool x_sign = std::signbit(x);
@@ -147,7 +147,7 @@ namespace exlib {
         }
 
         template <typename T>
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         auto operator*(const T& other) const noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();
             using result_type = integer<std::max(N, M), Word, Allocator, Signed>;
@@ -168,21 +168,21 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>> 
+        requires std::is_integral_v<I> 
         auto operator*(const I& val) const noexcept {
             using type = integer<sizeof(I) * byte_size, Word, Allocator, Signed>;
             return *this * type(val);
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         friend auto operator*(const I& lhs, const_reference rhs) noexcept {
             using type = integer<sizeof(I) * byte_size, Word, Allocator, Signed>;
             return type(lhs) * rhs;
         }
 
         template <typename T>
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         auto operator/(const T& other) const {
             if (other == 0) {
                 throw std::runtime_error("divided by zero!");
@@ -214,21 +214,21 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         auto operator/(const I& val) const {
             using type = integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed>;
             return *this / std::move(type(val));
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         friend auto operator/(const I& lhs, const_reference rhs) noexcept {
             using type = integer<std::max(sizeof(I) * byte_size, N), Word, Allocator, Signed>;
             return type(lhs) / rhs;
         }
 
         template <typename T>
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         auto operator%(const T& other) const {
             if (other == 0) {
                 throw std::runtime_error("divided by zero!");
@@ -257,21 +257,21 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         auto operator%(const I& val) const {
             using type = integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed>;
             return *this % type(val);
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         friend auto operator%(const I& lhs, const_reference rhs) noexcept {
             using result_type = integer<std::max(sizeof(I) * byte_size, N), Word, Allocator, Signed>;
             return result_type(lhs) % rhs;
         }
 
         template <typename T>
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         reference operator*=(const T& other) noexcept {
             auto lhs_abs = this->abs();
             auto rhs_abs = other.abs();
@@ -293,14 +293,14 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         reference operator*=(const I& val) noexcept {
             *this *= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
             return *this;
         }
 
         template <typename T>
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         reference operator/=(const T& other) {
             if (other == 0) {
                 throw std::runtime_error("divided by zero!");
@@ -331,14 +331,14 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         reference operator/=(const I& val) {
             *this /= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
             return *this;
         }
 
         template <typename T>
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         reference operator%=(const T& other) {
             if (other == 0) {
                 throw std::runtime_error("divided by zero!");
@@ -367,14 +367,14 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         reference operator%=(const I& val) {
             *this %= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
             return *this;
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         bit bitwise_add_assign(const T& other) noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();    
             bit carry = 0;
@@ -389,7 +389,7 @@ namespace exlib {
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         bit bitwise_sub_assign(const T& other) noexcept {
             // 使用位宽扩展，溢出时不作处理
             static constexpr std::size_t M = std::decay_t<T>::size();    
@@ -408,7 +408,7 @@ namespace exlib {
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>> && std::is_same_v<word_type, typename T::word_type>
+        requires is_integer_v<T> && std::is_same_v<word_type, typename T::word_type>
         bool _bitwise_equal(const T& other) const noexcept {
             for (std::size_t i = 0; i < std::max(array_size, other.array_size); ++i) {
                 Word lword = (i < array_size) ? _data[i] : this->filling_mask();
@@ -421,7 +421,7 @@ namespace exlib {
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>> && (!std::is_same_v<word_type, typename T::word_type>)
+        requires is_integer_v<T> && (!std::is_same_v<word_type, typename T::word_type>)
         bool _bitwise_equal(const T& other) const noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();    
             for (std::size_t i = 0; i < std::max(N, M); ++i) {
@@ -435,7 +435,7 @@ namespace exlib {
         }
 
         template <typename T>
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         auto operator&(const T& other) const noexcept {
             using type = integer<std::max(N, std::decay_t<T>::size()), Word, Allocator, Signed>;
             type res = *this;
@@ -443,7 +443,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         auto operator&(const I& i) const noexcept {
             using type = integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed>;
             type res = *this;
@@ -451,14 +451,14 @@ namespace exlib {
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         reference operator&=(const T& other) noexcept {
             this->_bitwise_ops_assign(other, [](auto &l, const auto& r){ l &= r; });
             return *this;
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         auto operator|(const T& other) const noexcept {
             using type = integer<std::max(N, std::decay_t<T>::size()), Word, Allocator, Signed>;
             type res = *this;
@@ -466,7 +466,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         auto operator|(const I& i) const noexcept {
             using type = integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed>;
             type res = *this;
@@ -474,13 +474,13 @@ namespace exlib {
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         reference operator|=(const T& other) noexcept {
             return _bitwise_ops_assign(other, [](auto& l, const auto& r){ l |= r;});
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         auto operator^(const T& other) const noexcept {
             using type = integer<std::max(N, std::decay_t<T>::size()), Word, Allocator, Signed>;
             type res = *this;
@@ -488,20 +488,20 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         auto operator^(const I& i) const noexcept {
             using type = integer<std::max(N, sizeof(I) * byte_size), Word, Allocator, Signed>;
             type res = *this;
             return res._bitwise_ops(integer<sizeof(I) * byte_size, Word, Allocator, Signed>(i), [](const auto& l, const auto& r) { return l ^ r; });
         }
 
-        template <typename T> requires is_integer_v<std::decay_t<T>>
+        template <typename T> requires is_integer_v<T>
         reference operator^=(const T& other) noexcept {
             return _bitwise_ops_assign(other, [](auto& l, const auto& r) { l ^= r; });
         }
         
         template <typename T, class Func>
-        requires is_integer_v<std::decay_t<T>> && std::is_same_v<word_type, typename T::word_type>
+        requires is_integer_v<T> && std::is_same_v<word_type, typename T::word_type>
         auto _bitwise_ops(const T& other, Func op) const noexcept {
             using type = integer<std::max(N, std::decay_t<T>::size()), Word, Allocator, Signed>;
             type res;
@@ -514,7 +514,7 @@ namespace exlib {
         }
 
         template <typename T, class Func>
-        requires is_integer_v<std::decay_t<T>> && (!std::is_same_v<word_type, typename T::word_type>)
+        requires is_integer_v<T> && (!std::is_same_v<word_type, typename T::word_type>)
         auto _bitwise_ops(const T& other, Func op) const noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();    
             integer<std::max(N, M), Word, Allocator, Signed> res;
@@ -527,7 +527,7 @@ namespace exlib {
         }
 
         template<typename T, class Func>
-        requires is_integer_v<std::decay_t<T>> && std::is_same_v<word_type, typename T::word_type>
+        requires is_integer_v<T> && std::is_same_v<word_type, typename T::word_type>
         reference _bitwise_ops_assign(const T& other, Func op) noexcept {
             for (std::size_t i = 0; i < array_size; ++i) {
                 word_type rword = ((i < other.array_size) ? other._data[i] : other.filling_mask());
@@ -537,7 +537,7 @@ namespace exlib {
         }
 
         template <typename T, class Func>
-        requires is_integer_v<std::decay_t<T>> && (!std::is_same_v<word_type, typename T::word_type>)
+        requires is_integer_v<T> && (!std::is_same_v<word_type, typename T::word_type>)
         reference _bitwise_ops_assign(const T& other, Func op) noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();    
             for (std::size_t i = 0; i < N; ++i) {
@@ -549,7 +549,7 @@ namespace exlib {
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         reference operator+=(const T& other) noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();    
             return _bitwise_add_assign<M>(
@@ -558,7 +558,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         reference operator+=(const I& x) noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             auto val = static_cast<std::conditional_t<Signed, std::make_signed_t<I>, std::make_unsigned_t<I>>>(x);
@@ -569,7 +569,7 @@ namespace exlib {
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         reference operator-=(const T& other) noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();    
             return _bitwise_sub_assign<M>(
@@ -578,7 +578,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         reference operator-=(const I& x) noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             auto val = static_cast<std::conditional_t<Signed, std::make_signed_t<I>, std::make_unsigned_t<I>>>(x);
@@ -589,8 +589,8 @@ namespace exlib {
         }
 
         template <typename T>
-        requires is_integer_v<std::decay_t<T>>
-        integer<std::max(N, std::decay_t<T>::size()), Word, Allocator, Signed> operator+(const T& other) const noexcept {
+        requires is_integer_v<T>
+        auto operator+(const T& other) const noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();    
             return this->_bitwise_add<M>(
             [this](std::size_t i) { return (i < N) ? this->_at(i) : this->sign(); },
@@ -598,7 +598,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         auto operator+(const I& val) const noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             const bool val_sign = std::is_signed_v<I> ? std::signbit(val) : 0;
@@ -608,7 +608,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         friend auto operator+(const I& lhs, const_reference rhs) noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             const bool lhs_sign = std::is_signed_v<I> ? std::signbit(lhs) : 0;
@@ -618,7 +618,7 @@ namespace exlib {
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         auto operator-(const T& other) const noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();    
             return _bitwise_sub<M>(
@@ -627,7 +627,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         friend auto operator-(const I& lhs, const_reference rhs) noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             const bool lhs_sign = std::is_signed_v<I> ? std::signbit(lhs) : 0;
@@ -637,7 +637,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         auto operator-(const I& val) const noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             const bool val_sign = std::is_signed_v<I> ? std::signbit(val) : 0;
@@ -647,24 +647,24 @@ namespace exlib {
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         bool operator==(const T& other) const noexcept {
             return this->_bitwise_equal(other);
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         bool operator==(const I& val) const noexcept {
             return this->_bitwise_equal(integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val));
         }
 
-        template <typename T> requires is_integer_v<std::decay_t<T>>
+        template <typename T> requires is_integer_v<T>
         bool operator!=(const T& other) const noexcept {
             return !(this->_bitwise_equal(other));
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         bool operator!=(const I& val) const noexcept {
             return !(this->_bitwise_equal(integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val)));
         }
@@ -740,7 +740,7 @@ namespace exlib {
         }
 
         template<typename I, class Func>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         static bool _bitwise_compare(const I& lhs, const_reference rhs, Func op) noexcept {
             constexpr std::size_t M = sizeof(I) * byte_size;
             const bit lhs_sign = std::is_signed_v<I> ? std::signbit(lhs) : 0;
@@ -760,7 +760,7 @@ namespace exlib {
         }
 
         template<typename T, class Func>
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         bool _bitwise_compare(const T& other, Func op) const noexcept {
             static constexpr std::size_t M = std::decay_t<T>::size();    
             if (this->sign() != other.sign()) {
@@ -779,70 +779,70 @@ namespace exlib {
         }
 
         template <typename T> 
-        requires is_integer_v<std::decay_t<T>>
+        requires is_integer_v<T>
         bool operator<(const T& other) const noexcept {
             return _bitwise_compare(other, [](const auto& l, const auto& r){ return l < r; });
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         friend bool operator<(const I& lhs, const_reference rhs) noexcept {
             return _bitwise_compare(lhs, rhs, [](const auto& l, const auto& r){ return l < r; });
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         bool operator<(const I& i) const noexcept {
             return *this < integer<sizeof(I) * byte_size, Word, Allocator, Signed>(i);
         }
 
-        template <typename T> requires is_integer_v<std::decay_t<T>>
+        template <typename T> requires is_integer_v<T>
         bool operator<=(const T& other) const noexcept {
             return *this == other || *this < other;
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         friend bool operator<=(const I& lhs, const_reference rhs) noexcept {
             return (rhs == lhs) || (rhs < lhs);
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         bool operator<=(const I& val) const noexcept {
             return *this <= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
         }
 
-        template <typename T> requires is_integer_v<std::decay_t<T>>
+        template <typename T> requires is_integer_v<T>
         bool operator>(const T& other) const noexcept {
             return _bitwise_compare(other, [](const auto& l, const auto& r){ return l > r; });
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         friend bool operator>(const I& lhs, const_reference rhs) noexcept {
             return _bitwise_compare(lhs, rhs, [](const auto& l, const auto& r) { return l > r; });
         }
 
         template<typename I>
-            requires std::is_integral_v<std::decay_t<I>>
+            requires std::is_integral_v<I>
         bool operator>(const I& i) const noexcept {
             return _bitwise_compare(integer<sizeof(I) * byte_size, Word, Allocator, Signed>(i), [](const auto& l, const auto& r) { return l > r; });
         }
 
-        template <typename T> requires is_integer_v<std::decay_t<T>>
+        template <typename T> requires is_integer_v<T>
         bool operator>=(const T& other) const noexcept {
             return *this == other || *this > other;
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         friend bool operator>=(const I& lhs, const_reference rhs) noexcept {
             return !(rhs < lhs);
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         bool operator>=(const I& val) const noexcept {
             return *this >= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
         }
@@ -1173,7 +1173,7 @@ namespace exlib {
         }
 
         template<typename I>
-        requires std::is_integral_v<std::decay_t<I>>
+        requires std::is_integral_v<I>
         operator I() const noexcept {
             I base = static_cast<I>(1);
             I res = static_cast<I>(0);
