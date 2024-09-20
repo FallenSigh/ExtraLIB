@@ -64,7 +64,7 @@ namespace exlib {
     struct is_shape<shape_helper<N, Shape>> : std::true_type {};
 
     template <typename T>
-    inline constexpr bool is_shape_v = is_shape<T>::value;
+    inline constexpr bool is_shape_v = is_shape<std::decay_t<T>>::value;
 
     template <typename Shape, class DType = double, class Allocator = std::allocator<DType>>
     struct ndarray;
@@ -76,7 +76,7 @@ namespace exlib {
     struct is_ndarray<ndarray<Shape, DType>> : std::true_type {};
 
     template <typename T>
-    inline constexpr bool is_ndarray_v = is_ndarray<T>::value;
+    inline constexpr bool is_ndarray_v = is_ndarray<std::decay_t<T>>::value;
 }
 
 namespace exlib {
@@ -361,40 +361,54 @@ namespace exlib {
 
         template <typename T>
         requires is_ndarray_v<T> && (std::is_same_v<shape_type, typename T::shape_type> || T::N == 1)
-        reference operator+=(const T& other) noexcept {
+        reference broadcast_op(const T& other, auto&& func) {
             using type = std::common_type_t<dtype, typename T::dtype>;
             if constexpr (T::N == 1) {
-                // try to broadcast
-                std::ranges::for_each(data, [&other](auto& elem){ elem += other.data[0]; });
+                std::ranges::for_each(data, [&other, &func](auto& elem){ func(elem, other.data[0]); });
             } else {
-                // add directly
                 std::ranges::transform(data, other.data, data.begin(), std::plus<type>());
             }
             return *this;
         }
 
         template <typename T>
-        requires is_ndarray_v<T> && std::is_same_v<shape_type, typename T::shape_type>
+        requires is_ndarray_v<T> && (std::is_same_v<shape_type, typename T::shape_type> || T::N == 1)
+        reference operator+=(const T& other) noexcept {
+            return broadcast_op(other, [](auto&& l, auto&& r) {
+                return l += r;
+            });
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T> && (std::is_same_v<shape_type, typename T::shape_type> || T::N == 1)
         reference operator-=(const T& other) noexcept {
-            using type = std::common_type_t<dtype, typename T::dtype>;
-            std::ranges::transform(data, other.data, data.begin(), std::minus<type>());
-            return *this;
+            return broadcast_op(other, [](auto&& l, auto&& r) {
+                return l -= r;
+            });
         }
 
         template <typename T>
-        requires is_ndarray_v<T> && std::is_same_v<shape_type, typename T::shape_type>
+        requires is_ndarray_v<T> && (std::is_same_v<shape_type, typename T::shape_type> || T::N == 1)
         reference operator*=(const T& other) noexcept {
-            using type = std::common_type_t<dtype, typename T::dtype>;
-            std::ranges::transform(data, other.data, data.begin(), std::multiplies<type>());
-            return *this;
+            return broadcast_op(other, [](auto&& l, auto&& r) {
+                return l *= r;
+            });
         }
 
         template <typename T>
-        requires is_ndarray_v<T> && std::is_same_v<shape_type, typename T::shape_type>
+        requires is_ndarray_v<T> && (std::is_same_v<shape_type, typename T::shape_type> || T::N == 1)
         reference operator/=(const T& other) noexcept {
-            using type = std::common_type_t<dtype, typename T::dtype>;
-            std::ranges::transform(data, other.data, data.begin(), std::divides<type>());
-            return *this;
+            return broadcast_op(other, [](auto&& l, auto&& r) {
+                return l /= r;
+            });
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T> && (std::is_same_v<shape_type, typename T::shape_type> || T::N == 1)
+        reference operator%=(const T& other) noexcept {
+            return broadcast_op(other, [](auto&& l, auto&& r) {
+                return l %= r;
+            });
         }
 
         template <typename T>

@@ -283,7 +283,7 @@ namespace exlib {
 
         template <typename T>
         requires (!is_ndarray_v<T>)
-        friend self_type operator+(const T& lhs, const_reference rhs) noexcept {
+        friend auto operator+(const T& lhs, const_reference rhs) noexcept {
             self_type res = rhs;
             using type = std::common_type_t<std::decay_t<T>, dtype>;
             res.left_ops(lhs, std::plus<type>());
@@ -292,7 +292,7 @@ namespace exlib {
 
         template <typename T>
         requires (!is_ndarray_v<T>)
-        friend self_type operator-(const T& lhs, const_reference rhs) noexcept {
+        friend auto operator-(const T& lhs, const_reference rhs) noexcept {
             self_type res = rhs;
             using type = std::common_type_t<std::decay_t<T>, dtype>;
             res.left_ops(lhs, std::minus<type>());
@@ -301,7 +301,7 @@ namespace exlib {
 
         template <typename T>
         requires (!is_ndarray_v<T>)
-        friend self_type operator/(const T& lhs, const_reference rhs) noexcept {
+        friend auto operator/(const T& lhs, const_reference rhs) noexcept {
             self_type res = rhs;
             using type = std::common_type_t<std::decay_t<T>, dtype>;
             res.left_ops(lhs, std::divides<type>());
@@ -310,7 +310,7 @@ namespace exlib {
 
         template <typename T>
         requires (!is_ndarray_v<T>)
-        friend self_type operator*(const T& lhs, const_reference rhs) noexcept {
+        friend auto operator*(const T& lhs, const_reference rhs) noexcept {
             self_type res = rhs;
             using type = std::common_type_t<std::decay_t<T>, dtype>;
             res.left_ops(lhs, std::multiplies<type>());
@@ -319,7 +319,7 @@ namespace exlib {
 
         template <typename T>
         requires (!is_ndarray_v<T>)
-        friend self_type operator%(const T& lhs, const_reference rhs) noexcept {
+        friend auto operator%(const T& lhs, const_reference rhs) noexcept {
             self_type res = rhs;
             using type = std::common_type_t<std::decay_t<T>, dtype>;
             res.left_ops(lhs, std::modulus<type>());
@@ -328,7 +328,7 @@ namespace exlib {
 
         template <typename T>
         requires (!is_ndarray_v<T>)
-        self_type operator+(const T& val) noexcept {
+        auto operator+(const T& val) noexcept {
             self_type copy = *this;
             copy += val;
             return copy;
@@ -336,7 +336,7 @@ namespace exlib {
 
         template <typename T>
         requires (!is_ndarray_v<T>)
-        self_type operator-(const T& val) noexcept {
+        auto operator-(const T& val) noexcept {
             self_type copy = *this;
             copy -= val;
             return copy;
@@ -344,7 +344,7 @@ namespace exlib {
 
         template <typename T>
         requires (!is_ndarray_v<T>)
-        self_type operator*(const T& val) noexcept {
+        auto operator*(const T& val) noexcept {
             self_type copy = *this;
             copy *= val;
             return copy;
@@ -352,7 +352,7 @@ namespace exlib {
 
         template <typename T>
         requires (!is_ndarray_v<T>)
-        self_type operator/(const T& val) noexcept {
+        auto operator/(const T& val) noexcept {
             self_type copy = *this;
             copy /= val;
             return copy;
@@ -368,142 +368,67 @@ namespace exlib {
 
         template <typename T>
         requires is_ndarray_v<T>
-        reference operator+=(const T& other) noexcept {
+        reference broadcast_op(const T& other, auto&& func) noexcept {
             if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
                 // same type: add directly
-                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l += r; });
+                std::ranges::transform(data, other.data, data.begin(), [&func](auto& l, auto& r){ return func(l, r); });
             } else if constexpr (N == T::N) {
                 // same size in dim: try to broadcast
-                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l += r; });
+                std::ranges::transform(data, other.data, data.begin(), [&func](auto& l, auto& r){ return func(l, r); });
             } else if constexpr (T::N == 1) {
                 // other size == 1: try to broadcast
-                std::ranges::for_each(data, [&other](auto& elem){ elem += other[0]; });
+                std::ranges::for_each(data, [&other, &func](auto& elem){ func(elem, other[0]); });
             } else {
                 // recursion
-                std::ranges::for_each(data, [&other](auto& elem){ elem += other; });
+                std::ranges::for_each(data, [&other, &func](auto& elem){ func(elem, other); });
             }
             return *this;
+        }
+
+        template <typename T>
+        requires is_ndarray_v<T>
+        reference operator+=(const T& other) noexcept {
+            return broadcast_op(other, [](auto&& l, auto&& r) {
+                return l += r;
+            });
         }
 
         template <typename T>
         requires is_ndarray_v<T>
         reference operator-=(const T& other) noexcept {
-            if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
-                // same type: add directly
-                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l -= r; });
-            } else if constexpr (N == T::N) {
-                // same size in dim: try to broadcast
-                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l -= r; });
-            } else if constexpr (T::N == 1) {
-                // other size == 1: try to broadcast
-                std::ranges::for_each(data, [&other](auto& elem){ elem -= other[0]; });
-            } else {
-                // recursion
-                std::ranges::for_each(data, [&other](auto& elem){ elem -= other; });
-            }
-            return *this;
+            return broadcast_op(other, [](auto&& l, auto&& r) {
+                return l -= r;
+            });
         }
 
         template <typename T>
         requires is_ndarray_v<T>
         reference operator*=(const T& other) noexcept {
-            if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
-                // same type: add directly
-                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l *= r; });
-            } else if constexpr (N == T::N) {
-                // same size in dim: try to broadcast
-                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l *= r; });
-            } else if constexpr (T::N == 1) {
-                // other size == 1: try to broadcast
-                std::ranges::for_each(data, [&other](auto& elem){ elem *= other[0]; });
-            } else {
-                // recursion
-                std::ranges::for_each(data, [&other](auto& elem){ elem *= other; });
-            }
-            return *this;
+            return broadcast_op(other, [](auto&& l, auto&& r) {
+                return l *= r;
+            });
         }
 
         template <typename T>
         requires is_ndarray_v<T>
         reference operator/=(const T& other) noexcept {
-            if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
-                // same type: add directly
-                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l /= r; });
-            } else if constexpr (N == T::N) {
-                // same size in dim: try to broadcast
-                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l /= r; });
-            } else if constexpr (T::N == 1) {
-                // other size == 1: try to broadcast
-                std::ranges::for_each(data, [&other](auto& elem){ elem /= other[0]; });
-            } else {
-                // recursion
-                std::ranges::for_each(data, [&other](auto& elem){ elem /= other; });
-            }
-            return *this;
+            return broadcast_op(other, [](auto&& l, auto&& r) {
+                return l /= r;
+            });
         }
 
         template <typename T>
         requires is_ndarray_v<T>
         reference operator%=(const T& other) noexcept {
-            if constexpr (std::is_same_v<shape_type, typename T::shape_type>) {
-                // same type: add directly
-                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l %= r; });
-            } else if constexpr (N == T::N) {
-                // same size in dim: try to broadcast
-                std::ranges::transform(data, other.data, data.begin(), [](auto& l, auto& r){ return l %= r; });
-            } else if constexpr (T::N == 1) {
-                // other size == 1: try to broadcast
-                std::ranges::for_each(data, [&other](auto& elem){ elem %= other[0]; });
-            } else {
-                // recursion
-                std::ranges::for_each(data, [&other](auto& elem){ elem %= other; });
-            }
-            return *this;
+            return broadcast_op(other, [](auto&& l, auto&& r) {
+                return l %= r;
+            });
         }
 
         template <typename T>
         requires is_ndarray_v<T> 
-        friend self_type operator+(const T& lhs, const_reference rhs) noexcept {
-            self_type res = rhs;
-            res += lhs;
-            return res;
-        }
-
-        template <typename T>
-        requires is_ndarray_v<T> 
-        friend self_type operator-(const T& lhs, const_reference rhs) noexcept {
-            self_type res = rhs;
-            res -= lhs;
-            return res;
-        }
-
-        template <typename T>
-        requires is_ndarray_v<T> 
-        friend self_type operator*(const T& lhs, const_reference rhs) noexcept {
-            self_type res = rhs;
-            res *= lhs;
-            return res;
-        }
-
-        template <typename T>
-        requires is_ndarray_v<T> 
-        friend self_type operator/(const T& lhs, const_reference rhs) noexcept {
-            self_type res = rhs;
-            res /= lhs;
-            return res;
-        }
-
-        template <typename T>
-        requires is_ndarray_v<T> 
-        friend self_type operator%(const T& lhs, const_reference rhs) noexcept {
-            self_type res = rhs;
-            res %= lhs;
-            return res;
-        }
-
-        template <typename T>
-        requires is_ndarray_v<T> 
-        self_type operator+(const T& other) noexcept {
+        auto operator+(const T& other) noexcept {
+            static_assert(T::size() <= size());
             self_type copy = *this;
             copy += other;
             return copy;
@@ -511,7 +436,8 @@ namespace exlib {
 
         template <typename T>
         requires is_ndarray_v<T> 
-        self_type operator-(const T& other) noexcept {
+        auto operator-(const T& other) noexcept {
+            static_assert(T::size() <= size());
             self_type copy = *this;
             copy -= other;
             return copy;
@@ -519,7 +445,8 @@ namespace exlib {
 
         template <typename T>
         requires is_ndarray_v<T> 
-        self_type operator*(const T& other) noexcept {
+        auto operator*(const T& other) noexcept {
+            static_assert(T::size() <= size());
             self_type copy = *this;
             copy *= other;
             return copy;
@@ -527,7 +454,8 @@ namespace exlib {
 
         template <typename T>
         requires is_ndarray_v<T> 
-        self_type operator/(const T& other) noexcept {
+        auto operator/(const T& other) noexcept {
+            static_assert(T::size() <= size());
             self_type copy = *this;
             copy /= other;
             return copy;
@@ -535,7 +463,8 @@ namespace exlib {
 
         template <typename T>
         requires is_ndarray_v<T> 
-        self_type operator%(const T& other) noexcept {
+        auto operator%(const T& other) noexcept {
+            static_assert(T::size() <= size());
             self_type copy = *this;
             copy %= other;
             return copy;
