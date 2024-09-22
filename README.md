@@ -1,6 +1,14 @@
 # ExtraLIB
 useless library
 
+### content:
+
+- n-bit signed/unsigned integer
+- float with n-bit mantissa
+- fraction
+- complex
+- numpy-like ndarray
+
 ### examples
 ```cpp
 #include <complex.h>
