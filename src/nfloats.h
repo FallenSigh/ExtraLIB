@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <iomanip>
+#include <ios>
 #include <limits>
 #include <type_traits>
 
@@ -79,6 +81,12 @@ namespace exlib {
             _sign = static_cast<bool>(0);
             _exponent = static_cast<exponent_type>(0);
             _mantissa = 0;
+        }
+
+        template <typename I>
+        requires std::is_integral_v<I>
+        nfloats(const I& i) noexcept {
+            this->assign_int(i);
         }
 
         template <class I>
@@ -475,14 +483,21 @@ namespace exlib {
         }
 
         friend std::ostream& operator<<(std::ostream& os, const nfloats& val) noexcept {
-            os << val.str();
+            std::streamsize old_prec = os.precision();
+            if (old_prec != std::numeric_limits<std::streamsize>::max()) {
+                os << std::fixed << std::setprecision(old_prec);
+            }
+
+            os << val.str(old_prec);
+            os.setf(std::ios::dec, std::ios::basefield);
+            os.precision(old_prec);
             return os;
         }
     };
 }
 
 template<std::size_t N, class Exponent>
-struct std::formatter<exlib::nfloats<N, Exponent>> : std::formatter<std::string> {
+struct std::formatter<exlib::nfloats<N, Exponent>> : std::formatter<double> {
     auto format(const auto& f, auto& ctx) const {
         return std::format_to(ctx.out(), "{}", f.str());
     }
