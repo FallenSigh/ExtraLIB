@@ -10,7 +10,6 @@
 #include <utility>
 
 #include "array_type.h"
-#include "../log.h"
 
 namespace exlib {
     namespace details {
@@ -209,6 +208,11 @@ namespace exlib {
             for (std::size_t i = 0; i < N; i++) {
                 data[i] = other.data[i];
             }
+            return *this;
+        }
+
+        reference operator=(const_reference other) noexcept {
+            std::copy(other.data.begin(), other.data.end(), data.begin());
             return *this;
         }
 
