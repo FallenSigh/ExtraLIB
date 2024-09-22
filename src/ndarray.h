@@ -18,7 +18,7 @@
 #include "log.h"
 
 namespace exlib {
-    template <typename Shape, class DType, class Allocator>
+    template <typename Shape, class DType>
     struct ndarray {
         static_assert(is_shape_v<Shape>);
 
@@ -31,7 +31,7 @@ namespace exlib {
         using one_dim = std::false_type;
         using data_type = ndarray<typename Shape::next_shape_type, DType>;
         using value_type = data_type;
-        using array_type = std::conditional_t<std::is_void_v<Allocator>, details::static_array<data_type, N>, details::dynamic_array<data_type, N, typename details::rebind<data_type, Allocator>::type>>;
+        using array_type = details::static_array<data_type, N>;
 
         using iterator = typename array_type::iterator;
         using const_iterator = typename array_type::const_iterator;
@@ -86,8 +86,12 @@ namespace exlib {
             return *this;
         }
 
-        reference operator=(const_reference other) noexcept {
-            std::copy(other.data.begin(), other.data.end(), data.begin());
+        template <typename T>
+        requires is_ndarray_v<T> && (shape_type::value == std::decay_t<T>::shape_type::value)
+        reference operator=(const T& other) noexcept {
+            for (std::size_t i = 0; i < N; i++) {
+                data[i] = other.data[i];
+            }
             return *this;
         }
 
@@ -121,6 +125,7 @@ namespace exlib {
             res = t;
             return res;
         }
+
 
         auto operator[](const ndarray<shape_type, bool>& cond) noexcept {
             std::vector<dtype> res;
@@ -161,13 +166,37 @@ namespace exlib {
             return *this;
         }
 
-        template <typename T = dtype>
+        template <typename T = DType>
         T mean() const noexcept {
             return sum<T>() / static_cast<T>(shape_type::size);
         }
 
         void fill(const dtype& value) noexcept {
             std::ranges::for_each(data, [&value](auto& elem){ elem.fill(value); });
+        }
+
+        template <typename First, typename...Second>
+        requires std::is_void_v<First>
+        auto slice() noexcept {
+            static_assert(1 + sizeof...(Second) <= N);
+            using sh = slice_helper<shape_type, First, Second...>::type;
+            auto res = ndarray<sh, dtype>();
+            for (std::size_t i = 0; i < N; i++) {
+                res.data[i] = data[i].template slice<Second...>(); 
+            }
+            return res;
+        }
+
+        template <typename First, typename...Second>
+        requires (!std::is_void_v<First>)
+        auto slice() noexcept {
+            static_assert(1 + sizeof...(Second) <= N);
+            using sh = slice_helper<shape_type, First, Second...>::type;
+            auto res = ndarray<sh, dtype>();
+            for (int i = First::M; i != First::N; i++) {
+                res.data[i - First::M] = data[i].template slice<Second...>(); 
+            }
+            return res;
         }
 
         template <typename OShape, class ODtype = dtype>
@@ -651,7 +680,11 @@ requires exlib::is_ndarray_v<T>
 struct std::formatter<T> : std::formatter<std::string> {
     auto format(const auto& arr, auto& ctx) const {
         std::stringstream ss;
-        arr.print(ss);
+        if (arr.N != 0) {
+            arr.print(ss);
+        } else {
+            ss << "[]";
+        }
         return std::format_to(ctx.out(), "{}", ss.str());
     }
 };

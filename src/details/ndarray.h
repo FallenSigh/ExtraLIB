@@ -7,6 +7,7 @@
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 #include "array_type.h"
 #include "../log.h"
@@ -54,6 +55,17 @@ namespace exlib {
         inline static constexpr std::size_t size = N * block_size;
     };
 
+    template <std::size_t N>
+    struct shape_helper<N, void> {
+        using type = shape_helper<N, void>;
+        inline static constexpr auto value = std::make_tuple(N);
+        inline static constexpr std::size_t first = N;
+        using second = void;
+        using next_shape_type = void;
+        inline static constexpr std::size_t block_size = 1;
+        inline static constexpr std::size_t size = N * block_size;
+    };
+
     template <typename T>
     struct is_shape : std::false_type {};
 
@@ -66,7 +78,55 @@ namespace exlib {
     template <typename T>
     inline constexpr bool is_shape_v = is_shape<std::decay_t<T>>::value;
 
-    template <typename Shape, class DType = double, class Allocator = std::allocator<DType>>
+    template <std::size_t offset, auto ...indices>
+    auto make_offset_integer_squence(std::index_sequence<indices...>) {
+        return std::index_sequence<(indices + offset)...>{};
+    }
+
+    template <int M, int N>
+    auto make_integer_range() {
+        static_assert(M <= N, "M should <= N");
+        return make_offset_integer_squence<M>(std::make_index_sequence<N - M + 1>{});
+    }
+
+    template <int m, int n>
+    struct slice {
+        inline static constexpr int M = m;
+        inline static constexpr int N = n;
+    };
+
+    template<typename Shape, typename First, typename ...Rest>
+    struct slice_helper {
+        using type = exlib::shape_helper<First::N - First::M, typename slice_helper<typename Shape::next_shape_type, Rest...>::type>;
+    };
+
+    template<typename Shape, typename ...Rest>
+    struct slice_helper<Shape, void, Rest...> {
+        using type = exlib::shape_helper<Shape::first, typename slice_helper<typename Shape::next_shape_type, Rest...>::type>;
+    };
+
+    template<typename Shape, typename First>
+    struct slice_helper<Shape, First> {
+        inline static constexpr bool is_void = std::is_void_v<First>;
+        using type = std::conditional_t<is_void, Shape, exlib::shape_helper<First::N - First::M, typename Shape::next_shape_type>>;
+    };
+
+    template <typename First>
+    struct slice_helper<void, First> {
+        using type = exlib::shape<First::N - First::M>;
+    };
+
+    template <typename Shape>
+    struct slice_helper<Shape, void> {
+        using type = Shape;
+    };
+
+    template <typename Slice>
+    auto slice_range() {
+        return make_integer_range<Slice::M, Slice::N>();
+    }
+
+    template <typename Shape, class DType = double>
     struct ndarray;
 
     template <typename T>
@@ -80,9 +140,9 @@ namespace exlib {
 }
 
 namespace exlib {
-    template <typename Shape, class DType, class Allocator>
+    template <typename Shape, class DType>
     requires std::is_void_v<typename Shape::second> 
-    struct ndarray<Shape, DType, Allocator> {
+    struct ndarray<Shape, DType> {
         static_assert(is_shape_v<Shape>);
 
         inline static constexpr auto shape = Shape::value;
@@ -93,8 +153,8 @@ namespace exlib {
         using dtype = DType;
         using one_dim = std::true_type;
         using data_type = dtype;
-        using array_type = std::conditional_t<std::is_void_v<Allocator>, details::static_array<data_type, N>, details::dynamic_array<data_type, N, Allocator>>;
-        
+        using array_type = details::static_array<data_type, N>;
+
         using iterator = typename array_type::iterator;
         using const_iterator = typename array_type::const_iterator;
         using reverse_iterator = typename array_type::reverse_iterator;
@@ -143,8 +203,12 @@ namespace exlib {
             return *this;
         }
 
-        reference operator=(const_reference other) noexcept {
-            std::copy(other.data.begin(), other.data.end(), data.begin());
+        template <typename T>
+        requires is_ndarray_v<T> && (shape_type::value == std::decay_t<T>::shape_type::value)
+        reference operator=(const T& other) noexcept {
+            for (std::size_t i = 0; i < N; i++) {
+                data[i] = other.data[i];
+            }
             return *this;
         }
 
@@ -227,11 +291,28 @@ namespace exlib {
             return res;
         }
 
+        template <typename Slice>
+        requires (!std::is_void_v<Slice>)
+        auto slice() noexcept {
+            using sh = exlib::shape<Slice::N - Slice::M>;
+            auto res = ndarray<sh, dtype>();
+            for (int i = Slice::M; i != Slice::N; i++) {
+                res.data[i - Slice::M] = data[i];
+            }
+            return res;
+        }
+
+        template <typename Slice>
+        requires (std::is_void_v<Slice>)
+        auto slice() noexcept {
+            return *this;
+        }
+
         template <typename OShape>
         requires is_shape_v<OShape>
-        ndarray<OShape, DType, Allocator> reshape() const noexcept {
+        ndarray<OShape, DType> reshape() const noexcept {
             static_assert(N * block_size == OShape::size);
-            ndarray<OShape, DType, Allocator> res;
+            ndarray<OShape, DType> res;
             std::vector<dtype> t;
             this->_flatten(t);
             res = t;
