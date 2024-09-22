@@ -1,6 +1,5 @@
 # ExtraLIB
 useless library
-not completed yet
 
 ### examples
 ```cpp
