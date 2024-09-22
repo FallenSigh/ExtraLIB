@@ -1,9 +1,10 @@
 #pragma once
 #include <format>
+#include <sstream>
 #include <string>
 
 namespace exlib {
-    template<class Dtype>
+    template<class Dtype = int>
     struct complex {
         using dtype = Dtype;
         using self_type = complex<dtype>;
@@ -78,7 +79,9 @@ namespace exlib {
         }
 
         std::string str() const noexcept {
-            return a.str() + " + i" + b.str();
+            std::stringstream ss;
+            ss << a << " + i" << b;
+            return ss.str();
         }
 
         friend std::ostream& operator<<(std::ostream& os, const auto& val) noexcept {
