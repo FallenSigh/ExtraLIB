@@ -57,7 +57,11 @@ namespace exlib {
 
         inline void output_log(log_level lev, std::string msg, const std::source_location& loc) {
             msg = std::format("{}:{} [{}] {}", loc.file_name(), loc.line(), _details::log_level_name(lev), msg);
-            if (lev >= max_level) {
+            if (lev == log_level::debug) {
+                std::cerr << k_level_ansi_colors[(std::uint8_t)lev] + msg +  k_reset_ansi_color + "\n";
+            }
+            
+            if (lev >= max_level && lev != log_level::debug) {
                 std::cout << k_level_ansi_colors[(std::uint8_t)lev] + msg +  k_reset_ansi_color + "\n";
             }
 
