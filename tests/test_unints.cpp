@@ -3,8 +3,8 @@
 #include <unordered_map>
 #include <functional>
 
-#include "../src/log.h"
-#include "../src/integer.h"
+#include "log.h"
+#include "integer.h"
 
 int main(void) {
     exlib::set_log_level(exlib::log_level::debug);
