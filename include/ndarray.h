@@ -178,7 +178,7 @@ namespace exlib {
         }
 
         template <typename First, typename...Second>
-        requires std::is_void_v<First>
+        requires std::is_void_v<First> && (sizeof...(Second) >= 1)
         auto slice() noexcept {
             static_assert(1 + sizeof...(Second) <= N);
             using sh = slice_helper<shape_type, First, Second...>::type;
@@ -190,7 +190,7 @@ namespace exlib {
         }
 
         template <typename First, typename...Second>
-        requires (!std::is_void_v<First>)
+        requires (!std::is_void_v<First>) && (sizeof...(Second) >= 1)
         auto slice() noexcept {
             static_assert(1 + sizeof...(Second) <= N);
             using sh = slice_helper<shape_type, First, Second...>::type;
@@ -199,6 +199,23 @@ namespace exlib {
                 res.data[i - First::M] = data[i].template slice<Second...>(); 
             }
             return res;
+        }
+
+        template <typename Slice>
+        requires (!std::is_void_v<Slice>)
+        auto slice() noexcept {
+            using sh = exlib::shape_helper<Slice::N - Slice::M, typename shape_type::next_shape_type>;
+            auto res = ndarray<sh, dtype>();
+            for (int i = Slice::M; i != Slice::N; i++) {
+                res.data[i - Slice::M] = data[i];
+            }
+            return res;
+        }
+
+        template <typename Slice>
+        requires (std::is_void_v<Slice>)
+        auto slice() noexcept {
+            return *this;
         }
 
         template <typename OShape, class ODtype = dtype>
@@ -557,7 +574,11 @@ namespace exlib {
 
         friend std::ostream& operator<<(std::ostream& os, const_reference val) noexcept {
             std::stringstream ss;
-            val.print(ss);
+            if (val.N != 0) {
+                val.print(ss);
+            } else {
+                ss << "[]";
+            }
             os << ss.str();
             return os;
         }

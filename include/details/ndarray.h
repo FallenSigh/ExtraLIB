@@ -4,6 +4,7 @@
 #include <cmath>
 #include <functional>
 #include <initializer_list>
+#include <numeric>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
@@ -240,10 +241,7 @@ namespace exlib {
 
         template <typename T = dtype>
         T sum() const noexcept {
-            T res = 0;
-            for (std::size_t i = 0; i < N; i++) {
-                res += data[i];
-            }
+            T res = std::accumulate(data.begin(), data.end(), static_cast<dtype>(0));
             return res;
         }
 
@@ -257,23 +255,23 @@ namespace exlib {
         }
 
         reference pow(const dtype& value) noexcept {
-            for (std::size_t i = 0; i < N; i++) {
-                data[i] = std::pow(data[i], value);
-            }
+            std::for_each(data.begin(), data.end(), [&value](auto& elem) {
+                elem = std::pow(elem, value);
+            });
             return *this;
         }
 
         reference exp() noexcept {
-            for (std::size_t i = 0; i < N; i++) {
-                data[i] = std::exp(data[i]);
-            }
+            std::for_each(data.begin(), data.end(), [](auto& elem) {
+                elem = std::exp(elem);
+            });
             return *this;
         }
 
         reference log() noexcept {
-            for (std::size_t i = 0; i < N; i++) {
-                data[i] = std::log(data[i]);
-            }
+            std::for_each(data.begin(), data.end(), [](auto& elem) {
+                elem = std::log(elem);
+            });
             return *this;
         }
 
