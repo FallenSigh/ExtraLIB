@@ -4,8 +4,6 @@
 #include <format>
 #include <functional>
 #include <initializer_list>
-#include <optional>
-#include <queue>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
@@ -15,7 +13,6 @@
 
 #include "details/print_tuple.h"
 #include "details/ndarray.h"
-#include "log.h"
 
 namespace exlib {
     template <typename Shape, class DType>
@@ -77,6 +74,11 @@ namespace exlib {
         requires (!is_ndarray_v<Range>)
         reference operator=(Range in) noexcept {
             return this->assign(in);
+        }
+
+        reference operator=(const_reference other) noexcept {
+            std::copy(other.data.begin(), other.data.end(), data.begin());
+            return *this;
         }
 
         reference operator=(self_type&& other) noexcept {
@@ -623,18 +625,18 @@ namespace exlib {
         return res;
     }
 
-    template <class Shape>
+    template <class Shape, class DType = double>
     requires is_shape_v<Shape>
     auto zeros() noexcept {
-        ndarray<Shape> res;
+        ndarray<Shape, DType> res;
         return res;
     }
 
-    template <class Shape>
+    template <class Shape, class DType = double>
     requires is_shape_v<Shape>
     auto ones() noexcept {
-        ndarray<Shape> res;
-        res.fill(static_cast<ndarray<Shape>::dtype>(1));
+        ndarray<Shape, DType> res;
+        res.fill(static_cast<DType>(1));
         return res;
     }
 
@@ -677,7 +679,7 @@ namespace exlib {
 
 template <typename T>
 requires exlib::is_ndarray_v<T>
-struct std::formatter<T> : std::formatter<std::string> {
+struct std::formatter<T> : std::formatter<typename T::dtype> {
     auto format(const auto& arr, auto& ctx) const {
         std::stringstream ss;
         if (arr.N != 0) {
