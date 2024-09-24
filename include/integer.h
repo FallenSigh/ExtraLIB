@@ -847,7 +847,7 @@ namespace exlib {
             return *this >= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
         }
 
-        self_type abs() const noexcept {
+        auto abs() const noexcept {
             if constexpr (!Signed) return *this;
 
             return (sign() == 0) ? *this : ~(*this) + self_type(1);
