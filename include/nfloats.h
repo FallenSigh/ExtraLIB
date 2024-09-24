@@ -254,6 +254,7 @@ namespace exlib {
                 return *this;
             }
 
+           
             _exponent += other._exponent + 1;
             _mantissa = (unints<mantissa_size * 2>(_mantissa) * other._mantissa) >> (mantissa_size);
             _sign ^= other._sign;
@@ -278,11 +279,9 @@ namespace exlib {
                     return *this;
                 }
             }
-            
             _sign ^= other._sign;
             _exponent -= other._exponent;
             _mantissa = ((unints<mantissa_size * 2>(_mantissa) << (mantissa_size - 1)) / other._mantissa);
-            
             if (_exponent >= max_exponent_limits) {
                 *this = inf();
             }
@@ -290,7 +289,6 @@ namespace exlib {
             if (_exponent <= min_exponent_limits) {
                 *this = zero();
             }
-
             return *this;
         }
 
@@ -439,21 +437,30 @@ namespace exlib {
 
         std::string str(std::size_t precision = 0) const noexcept {
             std::string s = _mantissa.bin();
-            std::string i = s.substr(0, _exponent + 1);
-            std::string m = s.substr(_exponent + 1, s.size() - (_exponent + 1));
-            
-            unints<n_fraction + extra_bits> ii, mm;
-            ii.rd_bin_string(i);
-            mm.rd_bin_string(m);
-            mm <<= (n_fraction + extra_bits - m.size());
-
-            std::string ipart = ii.str();
-            std::string fpart = mm.as_mantissa_str();
             std::string neg = (_sign == 0) ? "" : "-";
-            if (precision != 0) {
-                fpart = fpart.substr(0, std::min(precision, fpart.size()));
+            if (_exponent >= 0) {
+                std::string i = s.substr(0, _exponent + 1);
+                std::string m = s.substr(_exponent + 1, s.size() - (_exponent + 1));
+                unints<mantissa_size> ii, mm;
+                ii.rd_bin_string(i);
+                mm.rd_bin_string(m);
+                mm <<= (mantissa_size - m.size());
+                std::string ipart = ii.str();
+                std::string fpart = mm.as_mantissa_str();
+                if (precision != 0) {
+                    fpart = fpart.substr(0, std::min(precision, fpart.size()));
+                }
+                return neg + ipart + "." + fpart;
+            } else {
+                unints<mantissa_size> mm;
+                mm.rd_bin_string(s);
+                mm >>= -_exponent;
+                mm <<= 1;
+                std::string fpart = mm.as_mantissa_str();
+                return neg + "0." + fpart;
+
             }
-            return neg + ipart + "." + fpart;
+            return "0.0";
         }
 
         std::string bin() const noexcept {
@@ -487,9 +494,8 @@ namespace exlib {
             if (old_prec != std::numeric_limits<std::streamsize>::max()) {
                 os << std::fixed << std::setprecision(old_prec);
             }
-
             os << val.str(old_prec);
-            os.setf(std::ios::dec, std::ios::basefield);
+            // os.setf(std::ios::dec, std::ios::basefield);
             os.precision(old_prec);
             return os;
         }
