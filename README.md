@@ -1,7 +1,7 @@
 # ExtraLIB
 useless library
 
-### content:
+### content
 
 - n-bit signed/unsigned integer
 - float with n-bit mantissa
