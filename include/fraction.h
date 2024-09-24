@@ -26,9 +26,7 @@ namespace exlib {
     
         self_type operator+(const_reference other) const noexcept {
             auto lhs = *this;
-            lhs.b *= other.b;
-            lhs.a = lhs.a * other.b + lhs.b * other.a;
-            lhs.shrink();
+            lhs += other;
             return lhs;
         }
 
