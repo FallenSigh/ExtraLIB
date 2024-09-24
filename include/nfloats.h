@@ -45,7 +45,7 @@ namespace exlib {
         using const_reference = const nfloats<n_fraction, Exponent>&;
         using self_type = nfloats<n_fraction, Exponent>;
         using exponent_type = Exponent;
-        inline static constexpr std::size_t extra_bits = 4;
+        inline static constexpr std::size_t extra_bits = 1;
         using mantissa_type = unints<n_fraction + extra_bits>;
         inline static constexpr std::size_t mantissa_size = n_fraction + extra_bits;
         inline static constexpr std::size_t digits10 = std::floor(std::log10(2) * n_fraction);
@@ -254,8 +254,8 @@ namespace exlib {
                 return *this;
             }
 
-            _mantissa = (unints<mantissa_size * 2>(_mantissa) * other._mantissa) >> (mantissa_size - 1);
-            _exponent += other._exponent;
+            _exponent += other._exponent + 1;
+            _mantissa = (unints<mantissa_size * 2>(_mantissa) * other._mantissa) >> (mantissa_size);
             _sign ^= other._sign;
 
             if (_exponent >= max_exponent_limits) {
