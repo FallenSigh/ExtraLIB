@@ -3,7 +3,6 @@ build
 .vscode
 
 to_line.py
-test.cpp
 main.cpp
 
 test
