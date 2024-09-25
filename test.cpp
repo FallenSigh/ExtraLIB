@@ -1,15 +1,16 @@
 #include <complex.h>
 #include <iostream>
+#include <vector>
 
 #include "include/integer.h"
 #include "include/nfloats.h"
 #include "include/complex.h"
 #include "include/fraction.h"
 #include "include/ndarray.h"
+#include "include/random.h"
 
 int main(void) {
     using namespace exlib;
-
 {    
     // n-bit signed/unsigned integer
     nints<256> a("2147483647");
@@ -23,8 +24,8 @@ int main(void) {
 {
     // n-digits floating point
     // Not completed yet
-    nfloats<64> f = 33.1415926;
-    nfloats<64> g = 1.1616;
+    nfloats<128> f = 33.1415926;
+    nfloats<128> g = 11111.1616;
     std::cout << std::setprecision(10) << f + g << "\n";
     std::cout << std::setprecision(10) << f - g << "\n";
     std::cout << std::setprecision(10) << f * g << "\n";
@@ -68,6 +69,10 @@ int main(void) {
 
     std::cout << sum(c) << " " << mean(c) << "\n";
     std::cout << exp(a.slice<slice<1, 4>>()) << " " << log(a.slice<slice<1, 4>>()) << "\n";
+
+    std::cout << "random" << "\n";
+    auto e = exlib::random::randn<shape<5, 5>>();
+    std::cout << e << "\n";
 }
     return 0;
 }
