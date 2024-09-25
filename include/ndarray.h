@@ -97,6 +97,13 @@ namespace exlib {
             return *this;
         }
 
+        template <typename Func>
+        requires (std::is_invocable_v<Func>)
+        reference assign(Func&& func) {
+            std::ranges::for_each(data, [&func](auto& elem){ elem = func(); });
+            return *this;
+        }
+
         template <std::ranges::input_range Range>
         requires (!is_ndarray_v<Range>)
         reference assign(Range in) noexcept {
