@@ -223,6 +223,11 @@ namespace exlib {
             return this->assign(in);
         }
 
+        reference operator=(const dtype& val) noexcept {
+            std::ranges::for_each(data, [&val](auto& elem){ elem = val; });
+            return *this;
+        }
+
         template <std::ranges::input_range Range>
         requires (!is_ndarray_v<Range>)
         reference assign(Range in) noexcept {
@@ -442,6 +447,12 @@ namespace exlib {
             return copy;
         }
 
+        self_type operator-() const noexcept {
+            auto res = *this;
+            std::ranges::for_each(res.data, [](auto& elem){ elem = -elem; });
+            return res;
+        }
+
         template <typename T>
         requires is_ndarray_v<T> && (std::is_same_v<shape_type, typename T::shape_type> || T::N == 1)
         reference broadcast_op(const T& other, auto&& func) {
@@ -524,6 +535,51 @@ namespace exlib {
             self_type copy = *this;
             copy /= other;
             return copy;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        friend auto operator+(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            using type = std::common_type_t<std::decay_t<T>, dtype>;
+            res.left_ops(lhs, std::plus<type>());
+            return res;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        friend auto operator-(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            using type = std::common_type_t<std::decay_t<T>, dtype>;
+            res.left_ops(lhs, std::minus<type>());
+            return res;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        friend auto operator*(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            using type = std::common_type_t<std::decay_t<T>, dtype>;
+            res.left_ops(lhs, std::multiplies<type>());
+            return res;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        friend auto operator/(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            using type = std::common_type_t<std::decay_t<T>, dtype>;
+            res.left_ops(lhs, std::divides<type>());
+            return res;
+        }
+
+        template <typename T>
+        requires (!is_ndarray_v<T>)
+        friend auto operator%(const T& lhs, const_reference rhs) noexcept {
+            self_type res = rhs;
+            using type = std::common_type_t<std::decay_t<T>, dtype>;
+            res.left_ops(lhs, std::modulus<type>());
+            return res;
         }
 
         void left_ops(auto& lhs, auto&& op) {

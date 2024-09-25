@@ -97,6 +97,11 @@ namespace exlib {
             return *this;
         }
 
+        reference operator=(const dtype& val) noexcept {
+            std::ranges::for_each(data, [&val](auto& elem){ elem.operator=(val); });
+            return *this;
+        }
+
         template <typename Func>
         requires (std::is_invocable_v<Func>)
         reference assign(Func&& func) {
@@ -339,7 +344,7 @@ namespace exlib {
         template <typename T>
         requires (!is_ndarray_v<T>)
         friend auto operator+(const T& lhs, const_reference rhs) noexcept {
-            self_type res = rhs;
+            auto res = rhs;
             using type = std::common_type_t<std::decay_t<T>, dtype>;
             res.left_ops(lhs, std::plus<type>());
             return res;
@@ -419,6 +424,12 @@ namespace exlib {
             self_type copy = *this;
             copy %= val;
             return copy;
+        }
+
+        self_type operator-() const noexcept {
+            auto res = *this;
+            std::ranges::for_each(res.data, [](auto& elem){ elem.operator-(); });
+            return res;
         }
 
         template <typename T>
@@ -524,7 +535,6 @@ namespace exlib {
             copy %= other;
             return copy;
         }
-
         const_iterator cbegin() const noexcept {
             return data.cbegin();
         }
