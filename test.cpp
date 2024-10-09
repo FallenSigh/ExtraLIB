@@ -1,5 +1,6 @@
 #include <complex.h>
 #include <iostream>
+#include <valarray>
 #include <vector>
 
 #include "include/integer.h"
@@ -11,6 +12,7 @@
 
 int main(void) {
     using namespace exlib;
+    std::valarray<int> x;
 {    
     // n-bit signed/unsigned integer
     nints<256> a("2147483647");

@@ -7,8 +7,6 @@ enable_testing()
 
 include_directories(include)
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -rdynamic")
-
 add_compile_options(-Wall -Wextra -Werror=return-type)
 
 add_library(mallochook SHARED hook.cpp)

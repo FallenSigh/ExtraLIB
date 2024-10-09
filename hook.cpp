@@ -1,9 +1,11 @@
+#ifdef __linux
 #include <map>
 #include <new>
 #include <execinfo.h>
 #include <string>
 #include <utility>
 #include <cxxabi.h>
+
 
 // https://github.com/archibate/mallocvis
 
@@ -91,3 +93,5 @@ void operator delete(void *ptr) noexcept {
 }
 
 zstl::_malloc_hook::malloc_hook_init __malloc_hook;
+
+#endif
