@@ -238,6 +238,13 @@ namespace exlib {
             return *this;
         }
 
+        template <typename Func>
+        requires (std::is_invocable_v<Func>)
+        reference assign(Func&& func) {
+            std::ranges::for_each(data, [&func](auto& elem){ elem = func(); });
+            return *this;
+        }
+
         void _flatten(std::vector<dtype>& v) const noexcept {
             for (std::size_t i = 0; i < N; i++) {
                 v.push_back(data[i]);

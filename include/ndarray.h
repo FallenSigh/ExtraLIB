@@ -105,7 +105,7 @@ namespace exlib {
         template <typename Func>
         requires (std::is_invocable_v<Func>)
         reference assign(Func&& func) {
-            std::ranges::for_each(data, [&func](auto& elem){ elem = func(); });
+            std::ranges::for_each(data, [&func](auto& elem){ elem.assign(func); });
             return *this;
         }
 
