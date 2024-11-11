@@ -1,6 +1,5 @@
 #include <complex.h>
 #include <iostream>
-#include <memory>
 
 #include "include/integer.h"
 #include "include/nfloats.h"
