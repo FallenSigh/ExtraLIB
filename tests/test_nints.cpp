@@ -31,7 +31,6 @@ int main(void) {
         return true;
     };                
 
-
     std::unordered_map<int, std::function<bool()>> operations;
 
     operations[m++] = [&]() {

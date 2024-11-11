@@ -1,7 +1,6 @@
 #include <complex.h>
 #include <iostream>
-#include <valarray>
-#include <vector>
+#include <memory>
 
 #include "include/integer.h"
 #include "include/nfloats.h"
@@ -12,7 +11,6 @@
 
 int main(void) {
     using namespace exlib;
-    std::valarray<int> x;
 {    
     // n-bit signed/unsigned integer
     nints<256> a("2147483647");
@@ -50,6 +48,8 @@ int main(void) {
     // Not completed yet
     fraction<int> a(1, 3);
     fraction<int> b(1, 4);
+    std::cout << a.value() << "\n";
+    std::cout << b.value() << "\n";
     std::cout << a + b << "\n";
     std::cout << a - b << "\n";
     std::cout << a * b << "\n";

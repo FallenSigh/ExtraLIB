@@ -10,6 +10,11 @@ main
 test_nfloats
 test_nints
 test_unints
+test.exe
+main.exe
+test_nfloats.exe
+test_nints.exe
+test_unints.exe
 
 fraction
 complex
@@ -17,3 +22,9 @@ integer
 log
 print_tuple
 ndarray
+fraction.exe
+complex.exe
+integer.exe
+log.exe
+print_tuple.exe
+ndarray.exe

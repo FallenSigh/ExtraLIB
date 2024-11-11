@@ -9,7 +9,6 @@ namespace exlib {
         using self_type = fraction<dtype>;
         using reference = fraction<dtype>&;
         using const_reference = const fraction<dtype>&;
-        inline static constexpr std::size_t digits = 52;
 
         dtype a;
         dtype b;
@@ -97,8 +96,8 @@ namespace exlib {
             return res.str();
         }
 
-        nfloats<digits> value() const noexcept {
-            return nfloats<digits>(a) / nfloats<digits>(b);
+        auto value() const noexcept {
+            return nfloats<sizeof(dtype) * byte_size>(a) / nfloats<sizeof(dtype) * byte_size>(b);
         }
 
         friend std::ostream& operator<<(std::ostream& os, const fraction& val) noexcept {

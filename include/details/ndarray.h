@@ -4,6 +4,7 @@
 #include <cmath>
 #include <functional>
 #include <initializer_list>
+#include <memory>
 #include <numeric>
 #include <sstream>
 #include <tuple>
@@ -15,7 +16,7 @@
 namespace exlib {
     namespace details {
         template <typename ...Args>
-        consteval std::size_t mul(Args... args) {
+        consteval auto mul(Args... args) {
             return (args * ...);
         }
     }
@@ -126,7 +127,7 @@ namespace exlib {
         return make_integer_range<Slice::M, Slice::N>();
     }
 
-    template <typename Shape, class DType = double>
+    template <typename Shape, class DType = double, class Allocator = std::allocator<DType>>
     struct ndarray;
 
     template <typename T>
@@ -140,20 +141,21 @@ namespace exlib {
 }
 
 namespace exlib {
-    template <typename Shape, class DType>
+    template <typename Shape, class DType, class Allocator>
     requires std::is_void_v<typename Shape::second> 
-    struct ndarray<Shape, DType> {
+    struct ndarray<Shape, DType, Allocator> {
         static_assert(is_shape_v<Shape>);
 
         inline static constexpr auto shape = Shape::value;
         inline static constexpr std::size_t block_size = Shape::block_size;
         inline static constexpr std::size_t N = Shape::first;
 
+        using allocator_type = Allocator;
         using shape_type = Shape;
         using dtype = DType;
         using one_dim = std::true_type;
         using data_type = dtype;
-        using array_type = details::static_array<data_type, N>;
+        using array_type = std::conditional_t<std::is_void_v<Allocator>, details::static_array<data_type, N>, details::dynamic_array<DType, N, allocator_type>>;
 
         using iterator = typename array_type::iterator;
         using const_iterator = typename array_type::const_iterator;

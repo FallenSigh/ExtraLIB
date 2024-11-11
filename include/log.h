@@ -10,7 +10,7 @@
 
 namespace exlib {
 
-#define ZSTLLOG_FOREACH_LOGLEVEL(f) \
+#define EXLIB_LOG_FOREACH_LOGLEVEL(f) \
     f(trace)\
     f(debug)\
     f(info)\
@@ -20,7 +20,7 @@ namespace exlib {
 
     enum class log_level : std::uint8_t{
 #define _FUNCTION(name) name,
-        ZSTLLOG_FOREACH_LOGLEVEL(_FUNCTION)
+        EXLIB_LOG_FOREACH_LOGLEVEL(_FUNCTION)
 #undef _FUNCTION
     };
 
@@ -38,9 +38,9 @@ namespace exlib {
 
         inline char k_reset_ansi_color[4] = "\E[m";
 
-#define ZSTLLOG_IF_HAS_ANSI_COLORS(x) x
+#define EXLIB_LOG_IF_HAS_ANSI_COLORS(x) x
 #else
-#define ZSTLLOG_IF_HAS_ANSI_COLORS(x)
+#define EXLIB_LOG_IF_HAS_ANSI_COLORS(x)
 #endif
 
         inline log_level max_level = log_level::info;
@@ -48,7 +48,7 @@ namespace exlib {
         inline std::string log_level_name(log_level lev) {
             switch (lev) {
 #define _FUNCTION(name) case log_level::name: return #name;
-    ZSTLLOG_FOREACH_LOGLEVEL(_FUNCTION);
+    EXLIB_LOG_FOREACH_LOGLEVEL(_FUNCTION);
 #undef _FUNCTION
             };
             return "unknown";
@@ -64,6 +64,14 @@ namespace exlib {
             
             if (lev >= max_level && lev != log_level::debug) {
                 std::cout << k_level_ansi_colors[(std::uint8_t)lev] + msg +  k_reset_ansi_color + "\n";
+            }
+#else
+            if (lev == log_level::debug) {
+                std::cout << msg << "\n";
+            }
+            
+            if (lev >= max_level && lev != log_level::debug) {
+                std::cout << msg << "\n";
             }
 #endif
 
@@ -108,6 +116,6 @@ void log_##name(_details::with_source_location<std::format_string<Args...>> fmt,
     log(log_level::name, std::move(fmt), std::forward<Args>(args)...); \
 }\
 
-ZSTLLOG_FOREACH_LOGLEVEL(_FUNCTION)
+EXLIB_LOG_FOREACH_LOGLEVEL(_FUNCTION)
 #undef _FUNCTION
 }

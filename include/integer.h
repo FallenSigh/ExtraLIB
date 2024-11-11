@@ -9,11 +9,12 @@
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
+#include <climits>
 
 #include "details/uint4_t.h"
 #include "details/array_type.h"
 
-#define byte_size 8
+#define byte_size CHAR_BIT
 
 namespace exlib {
     // declaration
@@ -40,16 +41,18 @@ namespace exlib {
 namespace exlib {
     template<std::size_t N, class Word, class Allocator, bool Signed>
     struct integer {
-        static_assert(std::is_integral_v<Word>);;
+        static_assert(std::is_integral_v<Word> || std::is_same_v<details::uint4_t, std::decay_t<Word>>, "Word should be integer type!");
 
         struct iterator;
         struct const_iterator;
         struct bit_reference;
         struct bit_const_reference;
         friend struct bit_reference;
-        using reference = integer<N, Word, Allocator, Signed>&;
-        using const_reference = const integer<N, Word, Allocator, Signed>&;
         using self_type = integer<N, Word, Allocator, Signed>;
+        using reference = self_type&;
+        using const_reference = const self_type&;
+        using word_type = Word;
+        using bit = bool;
 
         inline static constexpr bool is_signed_v = Signed;
         inline static constexpr std::size_t word_size = std::is_same_v<details::uint4_t, Word> ? 4 : sizeof(Word) * byte_size; 
@@ -57,9 +60,7 @@ namespace exlib {
         inline static constexpr std::size_t digits = N;
         inline static constexpr std::size_t digits10 = std::floor(std::log10(2) * N) + 1;
 
-        using word_type = Word;
         using array_type = std::conditional_t<std::is_void_v<Allocator>, details::static_array<word_type, array_size>, details::dynamic_array<word_type, N, Allocator>>;
-        using bit = bool;
 
         array_type _data;
 
@@ -114,9 +115,9 @@ namespace exlib {
         template <typename T>
         requires is_integer_v<T>
         reference assign(const T& other) noexcept {
-            this->reset(other.filling_mask());
-            for (std::size_t i = 0; i < N; ++i) {
-                this->_at(i) = (i < other.size()) ? other._at(i) : other.sign();
+            this->fill(other.filling_mask());
+            for (std::size_t i = 0; i < other.size() && i < N; ++i) {
+                this->_at(i) = other._at(i);
             }
             return *this;
         }
@@ -139,9 +140,10 @@ namespace exlib {
             using type = std::conditional_t<Signed, std::make_signed_t<I>, std::make_unsigned_t<I>>;
             type x = static_cast<type>(i);
             constexpr std::size_t M = sizeof(x) * byte_size;
-            const bool x_sign = std::signbit(x);
-            for (std::size_t j = 0; j < N; ++j) {
-                this->_at(j) = (j < M) ? (x >> j & 1) : x_sign;
+            const bit x_sign = std::signbit(x);
+            this->fill(x_sign);
+            for (std::size_t j = 0; j < N && j < M; ++j) {
+                this->_at(j) = (x >> j & 1);
             }
             return *this;
         }
@@ -201,7 +203,7 @@ namespace exlib {
                 remainder[0] = lhs_abs[N - 1- i];
 
                 if (remainder >= rhs_abs) {
-                    remainder = remainder - rhs_abs;
+                    remainder -= rhs_abs;
                     quotient[N - 1 - i] = 1;
                 }
             }
@@ -503,8 +505,8 @@ namespace exlib {
         template <typename T, class Func>
         requires is_integer_v<T> && std::is_same_v<word_type, typename T::word_type>
         auto _bitwise_ops(const T& other, Func op) const noexcept {
-            using type = integer<std::max(N, std::decay_t<T>::size()), Word, Allocator, Signed>;
-            type res;
+            using result_type = integer<std::max(N, std::decay_t<T>::size()), Word, Allocator, Signed>;
+            result_type res;
             for (std::size_t i = 0; i < std::max(array_size, other.array_size); ++i) {
                 auto lword = ((i < array_size) ? this->_data[i] : this->filling_mask());
                 auto rword = ((i < other.array_size) ? other._data[i] : other.filling_mask());
@@ -680,7 +682,7 @@ namespace exlib {
                 throw std::runtime_error("left shifted bit count is negative!");
             }
             if (static_cast<std::size_t>(x) >= N) {
-                this->reset(0);
+                this->fill(0);
             } else {
                 for (std::size_t i = N - 1; ~i; i--) {
                     this->_at(i) = (i < static_cast<std::size_t>(x)) ? 0 : this->_at(i - static_cast<std::size_t>(x));
@@ -700,7 +702,7 @@ namespace exlib {
                 throw std::runtime_error("right shifted bit count is negative!");
             }
             if (static_cast<std::size_t>(x) >= N) {
-                this->reset(this->filling_mask());
+                this->fill(this->filling_mask());
             } else {
                 for (std::size_t i = 0; i < N; ++i) {
                     this->_at(i) = (i + static_cast<std::size_t>(x) < N) ? this->_at(i + static_cast<std::size_t>(x)) : sign();
@@ -847,10 +849,9 @@ namespace exlib {
             return *this >= integer<sizeof(I) * byte_size, Word, Allocator, Signed>(val);
         }
 
-        auto abs() const noexcept {
+        std::conditional_t<!Signed, const_reference, self_type> abs() const noexcept {
             if constexpr (!Signed) return *this;
-
-            return (sign() == 0) ? *this : ~(*this) + self_type(1);
+            else return (sign() == 0) ? *this : ~(*this) + self_type(1);
         }
 
         bit sign() const noexcept {
@@ -858,7 +859,7 @@ namespace exlib {
             return this->_at(N - 1);
         }
 
-        inline void reset(word_type value = 0) noexcept {
+        inline void fill(word_type value = 0) noexcept {
             this->_data.fill(value);
         }
 
@@ -953,16 +954,17 @@ namespace exlib {
         }
 
         static self_type max_value() noexcept {
-            static integer<N, Word, Allocator, Signed> res;
+            self_type res;
             std::fill(std::begin(res._data), std::end(res._data), -1);
             if (Signed) res._at(N - 1) = 0;
             return res;
         }
 
         template<std::size_t M, typename LBitFunc, typename RBitFunc>
-        inline static integer<std::max(N, M), Word, Allocator, Signed> _bitwise_add(LBitFunc lbitfunc, RBitFunc rbitfunc) noexcept {
+        inline static auto _bitwise_add(LBitFunc lbitfunc, RBitFunc rbitfunc) noexcept {
             // 使用位宽扩展 溢出不作处理
-            integer<std::max(N, M), Word, Allocator, Signed> res;
+            using result_type = integer<std::max(N, M), Word, Allocator, Signed>;
+            result_type res;
             bit carry = 0;
             
             for (std::size_t i = 0; i < std::max(N, M); ++i) {
@@ -989,9 +991,10 @@ namespace exlib {
         }
 
         template<std::size_t M, typename LBitFunc, typename RBitFunc>
-        inline static integer<std::max(N, M), Word, Allocator, Signed> _bitwise_sub(LBitFunc lbitfunc, RBitFunc rbitfunc) noexcept {
+        inline static auto _bitwise_sub(LBitFunc lbitfunc, RBitFunc rbitfunc) noexcept {
             // 使用位宽扩展 溢出不作处理
-            integer<std::max(N, M), Word, Allocator, Signed> res;
+            using result_type = integer<std::max(N, M), Word, Allocator, Signed>;
+            result_type res;
             bit borrow = 0;
             
             for (std::size_t i = 0; i < std::max(N, M); ++i) {
@@ -1031,7 +1034,7 @@ namespace exlib {
         }
 
         reference rd_bin_string(std::string s) noexcept {
-            this->reset(0);
+            this->fill(0);
             bool neg = false;
             if (s[0] == '-') {
                 neg = true;
@@ -1048,7 +1051,7 @@ namespace exlib {
         }
 
         reference rd_string(std::string s) noexcept {
-            this->reset(0);
+            this->fill(0);
             bool neg = false;
             if (s[0] == '-') {
                 neg = true;
@@ -1086,12 +1089,13 @@ namespace exlib {
             constexpr std::size_t M = std::size_t(N / std::log2(10)) * 4;
             integer<M, details::uint4_t, void, false> res = 0;
             
+            // Reverse double dabble
             for (std::size_t i = 0; i < N; ++i) {
                 res[M - 1] = this->_at(i);
 
                 for (std::size_t j = 0; j < res.array_size; ++j) {
-                    if (res._data[j] >= 8u) {
-                        res._data[j] -= 3u;
+                    if (res._data[j] >= 8) {
+                        res._data[j] -= 3;
                     }
                 }
                 if (i != N - 1) {
@@ -1101,7 +1105,7 @@ namespace exlib {
 
             std::stringstream ss;
             for (std::size_t i = res.array_size - 1; ~i; i--) {
-                ss << res._data[i].template value<int>();
+                ss << res._data[i].value();
             }
             return ss.str();
         } 
@@ -1357,27 +1361,6 @@ namespace exlib {
             }
         };
 
-        struct bit_const_reference {
-            const word_type* _word;
-            std::size_t _b_pos;
-
-            bit_const_reference(const integer& b, std::size_t pos) noexcept {
-                _word = &b._get_word(pos);
-                _b_pos = integer::_which_bit(pos);
-            }
-
-            bit_const_reference(const bit_const_reference&) noexcept = default;
-            ~bit_const_reference() noexcept { }
-        
-            inline bool operator~() const noexcept {
-                return ((*_word) & (1 << _b_pos)) == 0;
-            }
-
-            inline operator bool() const noexcept {
-                return ((*_word) & (1 << _b_pos)) != 0; 
-            }
-        };
-
         friend std::ostream& operator<<(std::ostream& os, const integer& val) noexcept {
             os << val.str();
             return os;
@@ -1422,10 +1405,10 @@ struct std::formatter<Int> : std::formatter<std::string> {
 
 namespace exlib {
     template <typename Int>
-    concept ExtraInt = std::is_integral_v<Int> || exlib::is_integer_v<Int>;
+    concept ExInt = std::is_integral_v<Int> || exlib::is_integer_v<Int>;
 
     template<class Int1, class Int2>
-    requires ExtraInt<Int1> && ExtraInt<Int2>
+    requires ExInt<Int1> && ExInt<Int2>
     std::common_type_t<Int1, Int2> pow(Int1 a, Int2 b) {
         std::common_type_t<Int1, Int2> res = std::common_type_t<Int1, Int2>(1);
         while (b) {
@@ -1437,7 +1420,7 @@ namespace exlib {
     }
 
     template<class Int1, class Int2>
-    requires ExtraInt<Int1> && ExtraInt<Int1>
+    requires ExInt<Int1> && ExInt<Int1>
     std::common_type_t<Int1, Int2> gcd(Int1 a, Int2 b) {
         if (b == 0) {
             return a;
@@ -1446,7 +1429,7 @@ namespace exlib {
     }
 
     template<class Int1, class Int2>
-    requires ExtraInt<Int1> && ExtraInt<Int1>
+    requires ExInt<Int1> && ExInt<Int1>
     std::common_type_t<Int1, Int2> lcm(Int1 a, Int2 b) {
         auto t = a / gcd(a, b);
         return a * b;

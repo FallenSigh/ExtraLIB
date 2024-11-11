@@ -4,6 +4,7 @@
 #include <format>
 #include <functional>
 #include <initializer_list>
+#include <memory>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
@@ -11,11 +12,12 @@
 #include <utility>
 #include <vector>
 
+#include "details/array_type.h"
 #include "details/print_tuple.h"
 #include "details/ndarray.h"
 
 namespace exlib {
-    template <typename Shape, class DType>
+    template <typename Shape, class DType, class Allocator>
     struct ndarray {
         static_assert(is_shape_v<Shape>);
 
@@ -23,12 +25,14 @@ namespace exlib {
         inline static constexpr std::size_t block_size = Shape::block_size;
         inline static constexpr std::size_t N = Shape::first;
         
+        using allocator_type = Allocator;
         using shape_type = Shape;
         using dtype = DType;
         using one_dim = std::false_type;
-        using data_type = ndarray<typename Shape::next_shape_type, DType>;
+        using data_type = ndarray<typename Shape::next_shape_type, dtype, allocator_type>;
         using value_type = data_type;
-        using array_type = details::static_array<data_type, N>;
+        using array_type = std::conditional_t<std::is_void_v<allocator_type>, details::static_array<data_type, N>, 
+            details::dynamic_array<data_type, N, typename std::allocator_traits<Allocator>::template rebind_alloc<data_type>>>;
 
         using iterator = typename array_type::iterator;
         using const_iterator = typename array_type::const_iterator;
